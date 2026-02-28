@@ -11,7 +11,7 @@ class SinaloaStockApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Sinaloa Stock',
+      title: 'La Sinaloa - Almacen',
       debugShowCheckedModeBanner: false, // Quitamos la etiqueta de "DEBUG"
       theme: ThemeData(
         brightness: Brightness.dark,
