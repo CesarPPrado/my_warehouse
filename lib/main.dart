@@ -12,7 +12,7 @@ class SinaloaStockApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'La Sinaloa - Almacen',
-      debugShowCheckedModeBanner: false, // Quitamos la etiqueta de "DEBUG"
+      debugShowCheckedModeBanner: false, // Quita la etiqueta de "DEBUG"
       theme: ThemeData(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: const Color(0xFF121212), // Color de fondo oscuro estilo Figma
