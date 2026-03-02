@@ -15,7 +15,7 @@ class SinaloaStockApp extends StatelessWidget {
       debugShowCheckedModeBanner: false, // Quita la etiqueta de "DEBUG"
       theme: ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF121212), // Color de fondo oscuro estilo Figma
+        scaffoldBackgroundColor: const Color(0xFF121212), // Color de fondo oscuro
         appBarTheme: const AppBarTheme(
           backgroundColor: Color(0xFF121212),
           elevation: 0, // AppBar sin sombra para que se fusione con el fondo
