@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'screens/home_screen.dart';
+import 'screens/main_layout.dart';
 
 void main() {
   runApp(const SinaloaStockApp());
@@ -21,7 +21,7 @@ class SinaloaStockApp extends StatelessWidget {
           elevation: 0, // AppBar sin sombra para que se fusione con el fondo
         ),
       ),
-      home: const HomeScreen(),
+      home: const MainLayout(),
     );
   }
 }

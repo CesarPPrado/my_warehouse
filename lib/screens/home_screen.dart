@@ -4,7 +4,6 @@ import '../widgets/alert_card.dart'; // Importamos el nuevo widget
 import 'inventory_screen.dart';
 import 'movements_screen.dart';
 import 'production_screen.dart';
-import 'settings_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -128,29 +127,6 @@ class HomeScreen extends StatelessWidget {
             ),
           ],
         ),
-      ),
-      // Barra de navegación inferior
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: const Color(0xFF1E1E1E),
-        selectedItemColor: Colors.greenAccent,
-        unselectedItemColor: Colors.grey,
-      // Agregamos la función onTap para que los botones reaccionen
-      onTap: (index) {
-          if (index == 1) {
-            // Índice 1 es el segundo botón: Inventario
-            Navigator.push(context, MaterialPageRoute(builder: (context) => const InventoryScreen()));
-          } else if (index == 3) {
-            // Índice 3 es el cuarto botón: Catálogos
-            Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingsScreen()));
-          }
-        },
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.inventory_2), label: 'Inventario'),
-          BottomNavigationBarItem(icon: Icon(Icons.history), label: 'Historial'),
-          BottomNavigationBarItem(icon: Icon(Icons.folder), label: 'Catálogos'),
-        ],
       ),
     );
   }
