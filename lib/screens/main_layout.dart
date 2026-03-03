@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
-import 'inventory_screen.dart';
 import 'history_screen.dart';
 import 'settings_screen.dart';
 
@@ -17,7 +16,6 @@ class _MainLayoutState extends State<MainLayout> {
   // Lista de las 4 pantallas principales
   final List<Widget> _screens = const [
     HomeScreen(),
-    InventoryScreen(),
     HistoryScreen(),
     SettingsScreen(),
   ];
@@ -42,10 +40,9 @@ class _MainLayoutState extends State<MainLayout> {
           });
         },
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.inventory_2), label: 'Inventario'),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Inicio'),
           BottomNavigationBarItem(icon: Icon(Icons.history), label: 'Historial'),
-          BottomNavigationBarItem(icon: Icon(Icons.folder), label: 'Catálogos'),
+          BottomNavigationBarItem(icon: Icon(Icons.folder), label: 'Configuración'),
         ],
       ),
     );

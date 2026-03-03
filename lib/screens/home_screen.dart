@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import '../widgets/action_button.dart';
 import '../widgets/alert_card.dart'; // Importamos el nuevo widget
 import 'inventory_screen.dart';
-import 'movements_screen.dart';
 import 'production_screen.dart';
+import 'inbound_screen.dart';
+import 'outbound_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -57,17 +58,21 @@ class HomeScreen extends StatelessWidget {
               children: [
                 ActionButton(
                   title: 'Entrada',
-                  subtitle: '(Proveedor)',
+                  subtitle: '(Proveedor/Area/Sucursal)',
                   icon: Icons.arrow_circle_down,
                   color: Colors.green.shade700,
-                  onTap: () { Navigator.push(context, MaterialPageRoute(builder: (context) => const MovementsScreen())); debugPrint("Ir a Entradas"); },
+                  onTap: () {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => const InboundScreen()));
+                  },
                 ),
                 ActionButton(
                   title: 'Salida',
-                  subtitle: '(Sucursal/Producción)',
+                  subtitle: '(Sucursal/Area)',
                   icon: Icons.arrow_circle_up,
                   color: Colors.blue.shade700,
-                  onTap: () { Navigator.push(context, MaterialPageRoute(builder: (context) => const MovementsScreen())); debugPrint("Ir a Salidas"); },
+                  onTap: () {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => const OutboundScreen()));
+                  },
                 ),
                 ActionButton(
                   title: 'Realizar',
