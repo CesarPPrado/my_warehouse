@@ -56,9 +56,9 @@ class _InboundScreenState extends State<InboundScreen> {
               const SizedBox(height: 16),
 
               // ORIGEN Y DESTINO (Obligatorios)
-              _buildDropdown('Sucursal Origen *', '¿De dónde viene?', _sucursales, (val) => _origenSeleccionado = val, true),
+              _buildDropdown('Sucursal/Área Origen *', '¿De dónde viene?', _sucursales, (val) => _origenSeleccionado = val, true),
               const SizedBox(height: 16),
-              _buildDropdown('Sucursal Destino *', '¿A dónde entra?', _sucursales, (val) => _destinoSeleccionado = val, true),
+              _buildDropdown('Sucursal/Área Destino *', '¿A dónde entra?', _sucursales, (val) => _destinoSeleccionado = val, true),
               const SizedBox(height: 32),
 
               // BOTÓN GUARDAR CON VALIDACIÓN
