@@ -1,7 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-class InventoryScreen extends StatelessWidget {
+class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key});
+
+  @override
+  State<InventoryScreen> createState() => _InventoryScreenState();
+}
+
+class _InventoryScreenState extends State<InventoryScreen> {
+  // Canal de comunicación en tiempo real con Supabase
+  final _productosStream = Supabase.instance.client
+      .from('productos')
+      .stream(primaryKey: ['id'])
+      .order('nombre', ascending: true); // Los ordenamos alfabéticamente
 
   @override
   Widget build(BuildContext context) {
@@ -14,7 +26,7 @@ class InventoryScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // Barra de Búsqueda
+            // Barra de Búsqueda (Visual por ahora)
             TextField(
               decoration: InputDecoration(
                 hintText: 'Buscar producto...',
@@ -25,15 +37,12 @@ class InventoryScreen extends StatelessWidget {
                 ),
                 filled: true,
                 fillColor: const Color(0xFF1A1A1A),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
               ),
             ),
             const SizedBox(height: 16),
 
-            // Pestañas de Categorías (Scroll Horizontal)
+            // Pestañas de Categorías
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
@@ -47,39 +56,62 @@ class InventoryScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
-            // Lista de Productos
+            // Escuchando a PostgreSQL
             Expanded(
-              child: ListView(
-                children: const [
-                  ProductListCard(
-                    name: 'Harina de Trigo (50kg)',
-                    category: 'Batida',
-                    stock: '3 Sacos',
-                    status: 'CRÍTICO',
-                    statusColor: Colors.redAccent,
-                  ),
-                  ProductListCard(
-                    name: 'Royal Polvo (1kg)',
-                    category: 'Batida',
-                    stock: '5 Cajas',
-                    status: 'BAJO',
-                    statusColor: Colors.amber,
-                  ),
-                  ProductListCard(
-                    name: 'Sal Refinada (500g)',
-                    category: 'Especias',
-                    stock: '8 Paquetes',
-                    status: 'BAJO',
-                    statusColor: Colors.amber,
-                  ),
-                  ProductListCard(
-                    name: 'Bolsas de Plástico (1000u)',
-                    category: 'Empaque',
-                    stock: '45 Paquetes',
-                    status: 'OK',
-                    statusColor: Colors.green,
-                  ),
-                ],
+              child: StreamBuilder<List<Map<String, dynamic>>>(
+                stream: _productosStream,
+                builder: (context, snapshot) {
+                  // Mientras carga la primera vez
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator(color: Colors.greenAccent));
+                  }
+                  
+                  // Si hay algún error de conexión
+                  if (snapshot.hasError) {
+                    return Center(child: Text('Error de conexión: ${snapshot.error}', style: const TextStyle(color: Colors.red)));
+                  }
+
+                  final productos = snapshot.data ?? [];
+
+                  // Si la base de datos está vacía
+                  if (productos.isEmpty) {
+                    return const Center(child: Text('No hay productos en el inventario', style: TextStyle(color: Colors.grey)));
+                  }
+
+                  // Mostramos la lista real
+                  return ListView.builder(
+                    itemCount: productos.length,
+                    itemBuilder: (context, index) {
+                      final p = productos[index];
+                      
+                      // Lógica de inventario inteligente
+                      final num stockActual = p['stock_actual'];
+                      final num stockMinimo = p['stock_minimo'];
+                      
+                      String statusText;
+                      Color statusColor;
+
+                      if (stockActual == 0) {
+                        statusText = 'AGOTADO';
+                        statusColor = Colors.redAccent;
+                      } else if (stockActual <= stockMinimo) {
+                        statusText = 'BAJO';
+                        statusColor = Colors.amber;
+                      } else {
+                        statusText = 'OK';
+                        statusColor = Colors.green;
+                      }
+
+                      return ProductListCard(
+                        name: p['nombre'],
+                        category: p['categoria'],
+                        stock: '$stockActual ${p['unidad_medida']}',
+                        status: statusText,
+                        statusColor: statusColor,
+                      );
+                    },
+                  );
+                },
               ),
             ),
           ],
@@ -88,7 +120,6 @@ class InventoryScreen extends StatelessWidget {
     );
   }
 
-  // Widget pequeño para las "pestañas" de categorías
   Widget _buildFilterChip(String label, bool isSelected) {
     return Container(
       margin: const EdgeInsets.only(right: 8),
@@ -97,18 +128,12 @@ class InventoryScreen extends StatelessWidget {
         color: isSelected ? Colors.green.shade600 : const Color(0xFF2A2A2A),
         borderRadius: BorderRadius.circular(20),
       ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: isSelected ? Colors.white : Colors.grey.shade400,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
+      child: Text(label, style: TextStyle(color: isSelected ? Colors.white : Colors.grey.shade400, fontWeight: FontWeight.bold)),
     );
   }
 }
 
-// Widget reutilizable para cada producto en la lista
+// El mismo widget de tarjeta que ya teniamos
 class ProductListCard extends StatelessWidget {
   final String name;
   final String category;
@@ -117,12 +142,7 @@ class ProductListCard extends StatelessWidget {
   final Color statusColor;
 
   const ProductListCard({
-    super.key,
-    required this.name,
-    required this.category,
-    required this.stock,
-    required this.status,
-    required this.statusColor,
+    super.key, required this.name, required this.category, required this.stock, required this.status, required this.statusColor,
   });
 
   @override
@@ -130,29 +150,27 @@ class ProductListCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white10),
-      ),
+      decoration: BoxDecoration(color: const Color(0xFF1A1A1A), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white10)),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              const SizedBox(height: 4),
-              Text('Categoría: $category', style: const TextStyle(color: Colors.grey, fontSize: 12)),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Icon(Icons.circle, size: 12, color: statusColor),
-                  const SizedBox(width: 6),
-                  Text(stock, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                ],
-              ),
-            ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 4),
+                Text('Categoría: $category', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(Icons.circle, size: 12, color: statusColor),
+                    const SizedBox(width: 6),
+                    Text(stock, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  ],
+                ),
+              ],
+            ),
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
