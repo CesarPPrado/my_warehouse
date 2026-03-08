@@ -54,17 +54,20 @@ class _ManageProductsScreenState extends State<ManageProductsScreen> {
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      // BOTÓN EDITAR
                       IconButton(
                         icon: const Icon(Icons.edit, color: Colors.blueAccent),
                         onPressed: () {
-                          debugPrint('Abrir formulario para editar: ${producto['nombre']}');
+                          // Navegamos al formulario pasándole toda la información del producto
+                          Navigator.push(context, MaterialPageRoute(
+                            builder: (context) => ProductFormScreen(productoAEditar: producto)
+                          ));
                         },
                       ),
+                      // BOTÓN ELIMINAR
                       IconButton(
                         icon: const Icon(Icons.delete, color: Colors.redAccent),
-                        onPressed: () {
-                          debugPrint('Confirmar eliminación de: ${producto['nombre']}');
-                        },
+                        onPressed: () => _confirmarEliminacion(producto['id'], producto['nombre']),
                       ),
                     ],
                   ),
@@ -84,5 +87,44 @@ class _ManageProductsScreenState extends State<ManageProductsScreen> {
         label: const Text('Nuevo Producto', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
       ),
     );
+  }
+
+// NUEVA FUNCIÓN: Cuadro de diálogo y borrado en Supabase
+  Future<void> _confirmarEliminacion(int id, String nombre) async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('¿Eliminar Insumo?'),
+        content: Text('Estás a punto de borrar "$nombre". Esta acción no se puede deshacer.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false), // Cierra y regresa falso
+            child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            onPressed: () => Navigator.pop(context, true), // Cierra y regresa verdadero
+            child: const Text('Eliminar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    // Si el usuario presionó "Eliminar" en el cuadro de diálogo
+    if (confirmar == true) {
+      try {
+        // Ejecutamos la orden DELETE en la nube
+        await Supabase.instance.client.from('productos').delete().eq('id', id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Producto eliminado'), backgroundColor: Colors.redAccent));
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al eliminar: $e'), backgroundColor: Colors.red));
+        }
+      }
+    }
   }
 }

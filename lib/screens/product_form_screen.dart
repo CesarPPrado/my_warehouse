@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ProductFormScreen extends StatefulWidget {
-  const ProductFormScreen({super.key});
+  final Map<String, dynamic>? productoAEditar; // Variable opcional
+
+  // Si nos mandan un producto, lo guardamos. Si no, es null (modo crear).
+  const ProductFormScreen({super.key, this.productoAEditar});
 
   @override
   State<ProductFormScreen> createState() => _ProductFormScreenState();
@@ -17,6 +20,18 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   String? _unidadSeleccionada;
   bool _isLoading = false; // Controla el estado del botón de guardar
 
+  @override
+  void initState() {
+    super.initState();
+    // Si recibimos un producto para editar, llenamos los controladores
+    if (widget.productoAEditar != null) {
+      _nombreController.text = widget.productoAEditar!['nombre'];
+      _categoriaSeleccionada = widget.productoAEditar!['categoria'];
+      _unidadSeleccionada = widget.productoAEditar!['unidad_medida'];
+      _stockMinimoController.text = widget.productoAEditar!['stock_minimo'].toString();
+    }
+  }
+
   // Las listas reales del almacén
   final List<String> _categorias = ['Materia Prima', 'Empaque', 'Harinas y Polvos', 'Mantecas y Lácteos', 'Complementos'];
   final List<String> _unidades = ['Sacos', 'Kilos', 'Litros', 'Costales', 'Paquetes', 'Piezas', 'Rollos', 'Cajas', 'Bolsitas', 'Kits', 'Latas', 'Porrones'];
@@ -28,19 +43,33 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await Supabase.instance.client.from('productos').insert({
-        'nombre': _nombreController.text.trim(),
-        'categoria': _categoriaSeleccionada,
-        'unidad_medida': _unidadSeleccionada,
-        'stock_minimo': int.parse(_stockMinimoController.text.trim()),
-        'stock_actual': 0, // Por regla de negocio, un producto nuevo nace en 0
-      });
+      if (widget.productoAEditar == null) {
+        // MODO CREAR: Hacemos un INSERT normal
+        await Supabase.instance.client.from('productos').insert({
+          'nombre': _nombreController.text.trim(),
+          'categoria': _categoriaSeleccionada,
+          'unidad_medida': _unidadSeleccionada,
+          'stock_minimo': int.parse(_stockMinimoController.text.trim()),
+          'stock_actual': 0, 
+        });
+      } else {
+        // MODO EDITAR: Hacemos un UPDATE usando el ID
+        await Supabase.instance.client.from('productos').update({
+          'nombre': _nombreController.text.trim(),
+          'categoria': _categoriaSeleccionada,
+          'unidad_medida': _unidadSeleccionada,
+          'stock_minimo': int.parse(_stockMinimoController.text.trim()),
+        }).eq('id', widget.productoAEditar!['id']);
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Producto guardado con éxito', style: TextStyle(fontWeight: FontWeight.bold)), backgroundColor: Colors.green),
+          SnackBar(
+            content: Text(widget.productoAEditar == null ? 'Producto guardado' : 'Producto actualizado', style: const TextStyle(fontWeight: FontWeight.bold)), 
+            backgroundColor: Colors.green
+          ),
         );
-        Navigator.pop(context); // Cierra el formulario y regresa a la lista
+        Navigator.pop(context); 
       }
     } catch (e) {
       if (mounted) {
