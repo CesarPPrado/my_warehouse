@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'product_form_screen.dart';
 
 class ManageProductsScreen extends StatefulWidget {
   const ManageProductsScreen({super.key});
@@ -75,7 +76,8 @@ class _ManageProductsScreenState extends State<ManageProductsScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          debugPrint('Abrir formulario de nuevo producto');
+          // Aquí conectamos el botón con el formulario
+          Navigator.push(context, MaterialPageRoute(builder: (context) => const ProductFormScreen()));
         },
         backgroundColor: Colors.greenAccent,
         icon: const Icon(Icons.add, color: Colors.black),
