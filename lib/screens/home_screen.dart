@@ -28,7 +28,7 @@ class HomeScreen extends StatelessWidget {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('La Sinaloa - Almacén', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24)),
+            const Text('Abarrotes Del Prado', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24)),
             // Llamamos a la función aquí
             Text(_obtenerFechaActual(), style: const TextStyle(fontSize: 14, color: Colors.grey)),
           ],

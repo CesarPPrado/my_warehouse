@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'manage_products_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -15,16 +16,20 @@ class SettingsScreen extends StatelessWidget {
         children: [
           const Text('Gestión de Base de Datos', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.greenAccent)),
           const SizedBox(height: 16),
-          _buildSettingsCard(Icons.inventory_2, 'Gestionar Productos', 'Agregar, editar o eliminar insumos del catálogo', Colors.green),
-          _buildSettingsCard(Icons.storefront, 'Gestionar Sucursales', 'Configurar puntos de distribución (Florido, Venecia, etc.)', Colors.blue),
-          _buildSettingsCard(Icons.people, 'Gestionar Proveedores', 'Administrar contactos y tiempos de entrega', Colors.purple),
-          _buildSettingsCard(Icons.science, 'Fórmulas y Recetas', 'Configurar pasajes, compuestos y kits de producción', Colors.orange),
+          // Aquí conectamos la pantalla de Gestionar Productos
+          _buildSettingsCard(context, Icons.inventory_2, 'Gestionar Productos', 'Agregar, editar o eliminar insumos del catálogo', Colors.green, const ManageProductsScreen()),
+          
+          // A estas les pasamos "null" por ahora para que muestren el mensajito de "en construcción"
+          _buildSettingsCard(context, Icons.storefront, 'Gestionar Sucursales', 'Configurar puntos de distribución', Colors.blue, null),
+          _buildSettingsCard(context, Icons.people, 'Gestionar Proveedores', 'Administrar contactos y tiempos', Colors.purple, null),
+          _buildSettingsCard(context, Icons.science, 'Fórmulas y Recetas', 'Configurar pasajes y compuestos', Colors.orange, null),
           
           const SizedBox(height: 32),
           const Text('Ajustes del Sistema', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey)),
           const SizedBox(height: 16),
-          _buildSettingsCard(Icons.manage_accounts, 'Usuarios y Permisos', 'Controlar quién puede registrar movimientos', Colors.grey.shade400),
-          _buildSettingsCard(Icons.print, 'Impresoras Térmicas', 'Configurar impresión de tickets y etiquetas', Colors.grey.shade400),
+
+          _buildSettingsCard(context, Icons.security, 'Usuarios y Permisos', 'Controlar quién puede registrar movimientos', Colors.grey, null),
+          _buildSettingsCard(context, Icons.print, 'Impresoras Térmicas', 'Configurar impresión de tickets y etiquetas', Colors.grey, null),
         ],
       ),
       // Botón flotante para agregar nuevos registros rápidamente
@@ -38,8 +43,8 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  // Widget reutilizable para las tarjetas del menú
-  Widget _buildSettingsCard(IconData icon, String title, String subtitle, Color iconColor) {
+  // Modifique el widget para aceptar una "ruta" (Widget de destino)
+  Widget _buildSettingsCard(BuildContext context, IconData icon, String title, String subtitle, Color iconColor, Widget? destination) {
     return Card(
       color: const Color(0xFF1A1A1A),
       margin: const EdgeInsets.only(bottom: 12),
@@ -55,7 +60,14 @@ class SettingsScreen extends StatelessWidget {
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text(subtitle, style: const TextStyle(color: Colors.grey, fontSize: 12)),
         trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-        onTap: () { debugPrint('Navegando a $title'); },
+        onTap: () { 
+          if (destination != null) {
+            Navigator.push(context, MaterialPageRoute(builder: (context) => destination));
+          } else {
+            // Muestra un mensaje si la pantalla aún no está construida
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Pantalla $title en construcción...')));
+          }
+        },
       ),
     );
   }
