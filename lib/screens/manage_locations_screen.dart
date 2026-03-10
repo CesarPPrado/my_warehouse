@@ -56,7 +56,15 @@ class _ManageLocationsScreenState extends State<ManageLocationsScreen> {
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      IconButton(icon: Icon(Icons.edit, color: colorTema), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => LocationFormScreen(sucursalAEditar: suc)))),
+                      IconButton(
+                        icon: Icon(Icons.edit, color: colorTema), 
+                        onPressed: () => Navigator.push(context, MaterialPageRoute(
+                          builder: (_) => LocationFormScreen(
+                            sucursalAEditar: suc, 
+                            esProveedor: widget.esProveedor
+                          )
+                        ))
+                      ),
                       IconButton(icon: const Icon(Icons.delete, color: Colors.redAccent), onPressed: () async { await Supabase.instance.client.from('sucursales').delete().eq('id', suc['id']); }),
                     ],
                   ),
@@ -68,7 +76,11 @@ class _ManageLocationsScreenState extends State<ManageLocationsScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: colorTema, 
-        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LocationFormScreen())), 
+        onPressed: () => Navigator.push(context, MaterialPageRoute(
+          builder: (_) => LocationFormScreen(
+            esProveedor: widget.esProveedor
+          )
+        )), 
         child: const Icon(Icons.add, color: Colors.white)
       ),
     );

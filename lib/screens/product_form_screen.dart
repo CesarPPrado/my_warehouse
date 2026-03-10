@@ -91,7 +91,10 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Nuevo Insumo', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(
+          widget.productoAEditar == null ? 'Nuevo Registro' : 'Editar Registro',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
         backgroundColor: Colors.green.shade800,
       ),
       body: SingleChildScrollView(

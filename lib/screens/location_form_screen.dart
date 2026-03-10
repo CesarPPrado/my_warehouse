@@ -3,7 +3,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LocationFormScreen extends StatefulWidget {
   final Map<String, dynamic>? sucursalAEditar;
-  const LocationFormScreen({super.key, this.sucursalAEditar});
+  final bool esProveedor; // NUEVA VARIABLE
+
+  const LocationFormScreen({super.key, this.sucursalAEditar, required this.esProveedor});
 
   @override
   State<LocationFormScreen> createState() => _LocationFormScreenState();
@@ -22,6 +24,9 @@ class _LocationFormScreenState extends State<LocationFormScreen> {
     if (widget.sucursalAEditar != null) {
       _nombreController.text = widget.sucursalAEditar!['nombre'];
       _tipoSeleccionado = widget.sucursalAEditar!['tipo'];
+    } else if (widget.esProveedor) {
+      // Si es un registro nuevo y venimos de la pantalla de proveedores, preseleccionamos "Proveedor"
+      _tipoSeleccionado = 'Proveedor';
     }
   }
 
@@ -36,7 +41,7 @@ class _LocationFormScreenState extends State<LocationFormScreen> {
         await Supabase.instance.client.from('sucursales').update({'nombre': _nombreController.text.trim(), 'tipo': _tipoSeleccionado}).eq('id', widget.sucursalAEditar!['id']);
       }
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Registro guardado'), backgroundColor: Colors.blue));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Registro guardado'), backgroundColor: Colors.green));
       Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
@@ -48,16 +53,17 @@ class _LocationFormScreenState extends State<LocationFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Definimos el color y el título dependiendo de de dónde venimos
+    final colorTema = widget.esProveedor ? Colors.purple : Colors.blue;
+    final tituloNuevo = widget.esProveedor ? 'Nuevo Proveedor' : 'Nueva Sucursal';
+
     return Scaffold(
       appBar: AppBar(
-        // Aquí aplicamos la lógica dinámica para el título
         title: Text(
-          widget.sucursalAEditar == null 
-              ? 'Agregar Nueva Sucursal' 
-              : 'Editar ${widget.sucursalAEditar!['tipo']}', // Lee el tipo exacto (Bodega, Proveedor, etc.)
+          widget.sucursalAEditar == null ? tituloNuevo : 'Editar Registro',
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
-        backgroundColor: Colors.blue.shade800,
+        backgroundColor: colorTema.shade800,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -66,11 +72,32 @@ class _LocationFormScreenState extends State<LocationFormScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              TextFormField(controller: _nombreController, decoration: const InputDecoration(labelText: 'Nombre *', filled: true), validator: (v) => v!.isEmpty ? 'Requerido' : null),
+              TextFormField(
+                controller: _nombreController, 
+                decoration: const InputDecoration(labelText: 'Nombre *', filled: true), 
+                validator: (v) => v!.isEmpty ? 'Requerido' : null
+              ),
               const SizedBox(height: 16),
-              DropdownButtonFormField<String>(initialValue: _tipoSeleccionado, items: _tipos.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(), onChanged: (v) => _tipoSeleccionado = v, decoration: const InputDecoration(labelText: 'Tipo *', filled: true), validator: (v) => v == null ? 'Requerido' : null),
-              const SizedBox(height: 32),
-              ElevatedButton(onPressed: _isLoading ? null : _guardarSucursal, style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, padding: const EdgeInsets.all(16)), child: _isLoading ? const CircularProgressIndicator() : const Text('Guardar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+              
+              // Si es proveedor, ocultamos el selector de tipo porque siempre será "Proveedor"
+              if (!widget.esProveedor) ...[
+                DropdownButtonFormField<String>(
+                  initialValue: _tipoSeleccionado, 
+                  items: _tipos.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(), 
+                  onChanged: (v) => _tipoSeleccionado = v, 
+                  decoration: const InputDecoration(labelText: 'Tipo *', filled: true), 
+                  validator: (v) => v == null ? 'Requerido' : null
+                ),
+                const SizedBox(height: 32),
+              ] else ...[
+                const SizedBox(height: 16), // Espacio extra si ocultamos el dropdown
+              ],
+
+              ElevatedButton(
+                onPressed: _isLoading ? null : _guardarSucursal, 
+                style: ElevatedButton.styleFrom(backgroundColor: colorTema, padding: const EdgeInsets.all(16)), 
+                child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('Guardar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
+              ),
             ],
           ),
         ),
