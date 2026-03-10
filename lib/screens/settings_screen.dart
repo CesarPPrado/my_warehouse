@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'manage_products_screen.dart';
+import 'manage_locations_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -18,10 +19,12 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 16),
           // Aquí conectamos la pantalla de Gestionar Productos
           _buildSettingsCard(context, Icons.inventory_2, 'Gestionar Productos', 'Agregar, editar o eliminar insumos del catálogo', Colors.green, const ManageProductsScreen()),
+
+          // Pantalla 1: Solo Sucursales (Azul)
+          _buildSettingsCard(context, Icons.storefront, 'Gestionar Sucursales', 'Configurar puntos de distribución', Colors.blue, const ManageLocationsScreen(titulo: 'Sucursales y Bodegas', esProveedor: false)),
           
-          // A estas les pasamos "null" por ahora para que muestren el mensajito de "en construcción"
-          _buildSettingsCard(context, Icons.storefront, 'Gestionar Sucursales', 'Configurar puntos de distribución', Colors.blue, null),
-          _buildSettingsCard(context, Icons.people, 'Gestionar Proveedores', 'Administrar contactos y tiempos', Colors.purple, null),
+          // Pantalla 2: Solo Proveedores (Morado)
+          _buildSettingsCard(context, Icons.people, 'Gestionar Proveedores', 'Administrar contactos y tiempos', Colors.purple, const ManageLocationsScreen(titulo: 'Proveedores Externos', esProveedor: true)),
           _buildSettingsCard(context, Icons.science, 'Fórmulas y Recetas', 'Configurar pasajes y compuestos', Colors.orange, null),
           
           const SizedBox(height: 32),

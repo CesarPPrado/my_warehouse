@@ -11,7 +11,7 @@ class _ProductionScreenState extends State<ProductionScreen> {
   String? _formulaSeleccionada;
   final TextEditingController _cantidadController = TextEditingController(text: '1');
 
-  // Aquí mapeamos las recetas exactas de tus documentos
+  // Aquí mapeamos las recetas exactas de nuestros documentos
   final Map<String, List<String>> _recetas = {
     'Compuesto Chico (Batida)': [
       '- 150 grs de Royal',
