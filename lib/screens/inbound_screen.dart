@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class InboundScreen extends StatefulWidget {
   const InboundScreen({super.key});
@@ -8,86 +9,158 @@ class InboundScreen extends StatefulWidget {
 }
 
 class _InboundScreenState extends State<InboundScreen> {
-  // Llave global para validar el formulario completo
   final _formKey = GlobalKey<FormState>();
+  final _cantidadController = TextEditingController();
+  final _facturaController = TextEditingController();
+  final _loteController = TextEditingController();
 
-  String? _productoSeleccionado;
-  String? _origenSeleccionado;
-  String? _destinoSeleccionado;
-  final TextEditingController _cantidadController = TextEditingController();
+  int? _productoSeleccionado;
+  int? _origenSeleccionado;
+  int? _destinoSeleccionado;
+  bool _isLoading = false;
 
-  final List<String> _productos = ['Harina rosal saco 25 kg', 'Maseca Tío Toño', 'Frijol mayocoba'];
-  final List<String> _sucursales = ['Proveedor Externo', 'Bodega Principal', 'Producción Frijoles', 'Colorado', 'Florido'];
+  // Listas vacías que se llenarán con los datos reales de la base de datos
+  List<dynamic> _productos = [];
+  List<dynamic> _sucursales = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarCatalogos();
+  }
+
+  // 1. Descarga los catálogos en tiempo real
+  Future<void> _cargarCatalogos() async {
+    try {
+      final prods = await Supabase.instance.client.from('productos').select('id, nombre, stock_actual, unidad_medida').order('nombre');
+      final sucs = await Supabase.instance.client.from('sucursales').select('id, nombre').order('nombre');
+
+      if (mounted) {
+        setState(() {
+          _productos = prods;
+          _sucursales = sucs;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error al cargar catálogos: $e');
+    }
+  }
+
+  // 2. La lógica matemática y de base de datos
+  Future<void> _guardarEntrada() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _isLoading = true);
+
+    try {
+      final cantidadAIngresar = num.parse(_cantidadController.text.trim());
+
+      // A. Calculamos el nuevo stock en memoria
+      final productoActual = _productos.firstWhere((p) => p['id'] == _productoSeleccionado);
+      final nuevoStock = productoActual['stock_actual'] + cantidadAIngresar;
+
+      // B. Registramos el ticket en el historial (movimientos)
+      await Supabase.instance.client.from('movimientos').insert({
+        'tipo_movimiento': 'Entrada',
+        'producto_id': _productoSeleccionado,
+        'cantidad': cantidadAIngresar,
+        'factura': _facturaController.text.trim().isEmpty ? null : _facturaController.text.trim(),
+        'lote': _loteController.text.trim().isEmpty ? null : _loteController.text.trim(),
+        'origen_id': _origenSeleccionado,
+        'destino_id': _destinoSeleccionado,
+      });
+
+      // C. Actualizamos la cantidad física en el almacén (productos)
+      await Supabase.instance.client.from('productos').update({
+        'stock_actual': nuevoStock,
+      }).eq('id', _productoSeleccionado!);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('¡Entrada registrada y stock sumado!', style: TextStyle(fontWeight: FontWeight.bold)), backgroundColor: Colors.green),
+        );
+        Navigator.pop(context); // Regresamos al menú principal
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _cantidadController.dispose();
+    _facturaController.dispose();
+    _loteController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Entrada de Mercancía', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.green.shade800, // Color distintivo para evitar errores
+        backgroundColor: Colors.green.shade800,
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey, // Envolvemos todo en un Form
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text('Detalles de Entrada', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 16),
-
-              // PRODUCTO (Obligatorio)
-              _buildDropdown('Producto *', 'Seleccione...', _productos, (val) => _productoSeleccionado = val, true),
-              const SizedBox(height: 16),
-
-              // CANTIDAD (Obligatorio) y FACTURA
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      // Si las listas están vacías, mostramos un círculo de carga
+      body: _productos.isEmpty 
+        ? const Center(child: CircularProgressIndicator(color: Colors.greenAccent))
+        : SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(child: _buildTextField('Cantidad *', 'Ej. 10', isNumber: true, isRequired: true, controller: _cantidadController)),
-                  const SizedBox(width: 16),
-                  Expanded(child: _buildTextField('Factura', 'Ej. FAC-123', isRequired: false)),
+                  const Text('Detalles de Entrada', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 16),
+
+                  _buildDropdown('Producto *', 'Seleccione...', _productos, _productoSeleccionado, (val) => setState(() => _productoSeleccionado = val as int?), true),
+                  const SizedBox(height: 16),
+
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: _buildTextField('Cantidad *', 'Ej. 10', isNumber: true, isRequired: true, controller: _cantidadController)),
+                      const SizedBox(width: 16),
+                      Expanded(child: _buildTextField('Factura (Opcional)', 'Ej. FAC-123', controller: _facturaController)),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  _buildTextField('Lote (Opcional)', 'Ej. L-2026-A', controller: _loteController),
+                  const SizedBox(height: 16),
+
+                  _buildDropdown('Sucursal/Área Origen *', '¿De dónde viene?', _sucursales, _origenSeleccionado, (val) => setState(() => _origenSeleccionado = val as int?), true),
+                  const SizedBox(height: 16),
+                  
+                  _buildDropdown('Sucursal/Área Destino *', '¿A dónde entra?', _sucursales, _destinoSeleccionado, (val) => setState(() => _destinoSeleccionado = val as int?), true),
+                  const SizedBox(height: 32),
+
+                  SizedBox(
+                    height: 55,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _guardarEntrada,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green.shade600,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: _isLoading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text('Confirmar Entrada', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                    ),
+                  ),
                 ],
               ),
-              const SizedBox(height: 16),
-              
-              _buildTextField('Lote', 'Ej. L-2026-A', isRequired: false),
-              const SizedBox(height: 16),
-
-              // ORIGEN Y DESTINO (Obligatorios)
-              _buildDropdown('Sucursal/Área Origen *', '¿De dónde viene?', _sucursales, (val) => _origenSeleccionado = val, true),
-              const SizedBox(height: 16),
-              _buildDropdown('Sucursal/Área Destino *', '¿A dónde entra?', _sucursales, (val) => _destinoSeleccionado = val, true),
-              const SizedBox(height: 32),
-
-              // BOTÓN GUARDAR CON VALIDACIÓN
-              ElevatedButton(
-                onPressed: () {
-                  // Si el formulario es válido, procede a guardar
-                  if (_formKey.currentState!.validate()) {
-                    debugPrint('Guardando Entrada de $_productoSeleccionado, de $_origenSeleccionado hacia $_destinoSeleccionado');
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Entrada registrada con éxito'), backgroundColor: Colors.green),
-                    );
-                    Navigator.pop(context); // Regresa al menú
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green.shade600,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Text('Confirmar Entrada', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
     );
   }
 
-  // Widgets mejorados con validación (TextFormField en lugar de TextField)
+  // Widgets adaptados para leer los IDs y Nombres reales de la base de datos
   Widget _buildTextField(String label, String hint, {bool isNumber = false, bool isRequired = false, TextEditingController? controller}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -96,38 +169,38 @@ class _InboundScreenState extends State<InboundScreen> {
         const SizedBox(height: 8),
         TextFormField(
           controller: controller,
-          keyboardType: isNumber ? TextInputType.number : TextInputType.text,
-          validator: isRequired ? (value) {
-            if (value == null || value.isEmpty) return 'Requerido';
-            return null;
-          } : null,
+          keyboardType: isNumber ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
+          validator: isRequired ? (value) => (value == null || value.isEmpty) ? 'Requerido' : null : null,
           decoration: InputDecoration(
             hintText: hint,
             filled: true,
             fillColor: const Color(0xFF1A1A1A),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-            errorStyle: const TextStyle(color: Colors.redAccent),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildDropdown(String label, String hint, List<String> items, Function(String?) onChanged, bool isRequired) {
+  Widget _buildDropdown(String label, String hint, List<dynamic> items, int? selectedValue, Function(dynamic) onChanged, bool isRequired) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
         const SizedBox(height: 8),
-        DropdownButtonFormField<String>(
-          validator: isRequired ? (value) => value == null ? 'Seleccione una opción' : null : null,
+        DropdownButtonFormField<int>(
+          initialValue: selectedValue,
+          validator: isRequired ? (value) => value == null ? 'Requerido' : null : null,
           decoration: InputDecoration(
             filled: true,
             fillColor: const Color(0xFF1A1A1A),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
           ),
           hint: Text(hint),
-          items: items.map((String value) => DropdownMenuItem<String>(value: value, child: Text(value))).toList(),
+          items: items.map((item) => DropdownMenuItem<int>(
+            value: item['id'], 
+            child: Text(item['nombre'], overflow: TextOverflow.ellipsis)
+          )).toList(),
           onChanged: onChanged,
         ),
       ],
