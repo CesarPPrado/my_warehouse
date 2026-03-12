@@ -9,21 +9,19 @@ class InboundScreen extends StatefulWidget {
 }
 
 class _InboundScreenState extends State<InboundScreen> {
-  // --- VARIABLES DE ENCABEZADO (Aplica para toda la entrada) ---
+  // Encabezado
   int? _proveedorSeleccionado;
   final _facturaController = TextEditingController();
-  int? _idAlmacenProduccion; // Guardaremos el ID del destino automático
+  int? _idAlmacenProduccion; 
 
-  // --- VARIABLES DE LÍNEA (Para el producto individual) ---
+  // Línea
   final _lineaFormKey = GlobalKey<FormState>();
   int? _productoActual;
-  final _cantidadController = TextEditingController();
+  final _cajasController = TextEditingController();
+  final _piezasController = TextEditingController();
   final _loteController = TextEditingController();
 
-  // --- EL "CARRITO" DE ENTRADAS ---
   final List<Map<String, dynamic>> _listaEntradas = [];
-
-  // Catálogos
   List<dynamic> _productos = [];
   List<dynamic> _proveedores = [];
   bool _isLoading = false;
@@ -36,17 +34,15 @@ class _InboundScreenState extends State<InboundScreen> {
 
   Future<void> _cargarCatalogos() async {
     try {
-      final prods = await Supabase.instance.client.from('productos').select('id, nombre, stock_actual, unidad_medida').order('nombre');
-      // Solo traemos a los que son tipo Proveedor
+      // AHORA TRAEMOS EL NUEVO CAMPO: piezas_por_caja
+      final prods = await Supabase.instance.client.from('productos').select('id, nombre, stock_actual, unidad_medida, piezas_por_caja').order('nombre');
       final provs = await Supabase.instance.client.from('sucursales').select('id, nombre').eq('tipo', 'Proveedor').order('nombre');
-      // Buscamos automáticamente el ID del Almacén para inyectarlo sin preguntar
       final destino = await Supabase.instance.client.from('sucursales').select('id').eq('nombre', 'Almacen Produccion').maybeSingle();
 
       if (mounted) {
         setState(() {
           _productos = prods;
           _proveedores = provs;
-          // Si no existe uno llamado "Producción", buscamos cualquier bodega, si no, null.
           _idAlmacenProduccion = destino != null ? destino['id'] : null; 
         });
       }
@@ -55,7 +51,18 @@ class _InboundScreenState extends State<InboundScreen> {
     }
   }
 
-  // Función para agregar un producto a la lista temporal (Carrito)
+  // --- MOTOR MATEMÁTICO EN TIEMPO REAL ---
+  int _calcularTotalTemporal() {
+    if (_productoActual == null) return 0;
+    final prodInfo = _productos.firstWhere((p) => p['id'] == _productoActual);
+    final ppc = prodInfo['piezas_por_caja'] ?? 1;
+    
+    final cajas = int.tryParse(_cajasController.text.trim()) ?? 0;
+    final piezas = int.tryParse(_piezasController.text.trim()) ?? 0;
+    
+    return ((cajas * ppc) + piezas).toInt();
+  }
+
   void _agregarALaLista() {
     if (!_lineaFormKey.currentState!.validate()) return;
     if (_productoActual == null) {
@@ -63,7 +70,16 @@ class _InboundScreenState extends State<InboundScreen> {
       return;
     }
 
+    final totalCalculado = _calcularTotalTemporal();
+    if (totalCalculado <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ingresa una cantidad mayor a 0'), backgroundColor: Colors.orange));
+      return;
+    }
+
     final prodInfo = _productos.firstWhere((p) => p['id'] == _productoActual);
+    final cajas = int.tryParse(_cajasController.text.trim()) ?? 0;
+    final piezas = int.tryParse(_piezasController.text.trim()) ?? 0;
+    final ppc = prodInfo['piezas_por_caja'] ?? 1;
     
     setState(() {
       _listaEntradas.add({
@@ -71,23 +87,24 @@ class _InboundScreenState extends State<InboundScreen> {
         'nombre_producto': prodInfo['nombre'],
         'unidad': prodInfo['unidad_medida'],
         'stock_previo': prodInfo['stock_actual'],
-        'cantidad': num.parse(_cantidadController.text.trim()),
+        'cajas': cajas,
+        'piezas_sueltas': piezas,
+        'piezas_por_caja': ppc,
+        'cantidad': totalCalculado, // El gran total que se va a la base de datos
         'lote': _loteController.text.trim().isEmpty ? null : _loteController.text.trim(),
       });
-      // Limpiamos los campos de la línea para el siguiente producto
+      
       _productoActual = null;
-      _cantidadController.clear();
+      _cajasController.clear();
+      _piezasController.clear();
       _loteController.clear();
     });
   }
 
   void _eliminarDeLaLista(int index) {
-    setState(() {
-      _listaEntradas.removeAt(index);
-    });
+    setState(() => _listaEntradas.removeAt(index));
   }
 
-  // Guarda todo en la base de datos
   Future<void> _guardarEntradaMasiva() async {
     if (_proveedorSeleccionado == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Falta seleccionar el Proveedor'), backgroundColor: Colors.red));
@@ -101,24 +118,22 @@ class _InboundScreenState extends State<InboundScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Preparamos la lista de movimientos para insertarlos todos de golpe (Bulk Insert)
       final factura = _facturaController.text.trim().isEmpty ? null : _facturaController.text.trim();
       
       List<Map<String, dynamic>> movimientosAInsertar = _listaEntradas.map((item) {
         return {
           'tipo_movimiento': 'Entrada',
           'producto_id': item['producto_id'],
-          'cantidad': item['cantidad'],
+          'cantidad': item['cantidad'], // Guarda las piezas totales
           'factura': factura,
           'lote': item['lote'],
           'origen_id': _proveedorSeleccionado,
-          'destino_id': _idAlmacenProduccion, // Destino automático
+          'destino_id': _idAlmacenProduccion, 
         };
       }).toList();
 
       await Supabase.instance.client.from('movimientos').insert(movimientosAInsertar);
 
-      // Actualizamos el stock de cada producto matemáticamente
       for (var item in _listaEntradas) {
         final nuevoStock = item['stock_previo'] + item['cantidad'];
         await Supabase.instance.client.from('productos').update({'stock_actual': nuevoStock}).eq('id', item['producto_id']);
@@ -139,7 +154,8 @@ class _InboundScreenState extends State<InboundScreen> {
   @override
   void dispose() {
     _facturaController.dispose();
-    _cantidadController.dispose();
+    _cajasController.dispose();
+    _piezasController.dispose();
     _loteController.dispose();
     super.dispose();
   }
@@ -152,7 +168,7 @@ class _InboundScreenState extends State<InboundScreen> {
         ? const Center(child: CircularProgressIndicator())
         : Column(
             children: [
-              // --- SECCIÓN 1: ENCABEZADO (Proveedor y Factura) ---
+              // --- SECCIÓN 1: ENCABEZADO ---
               Container(
                 padding: const EdgeInsets.all(16),
                 color: const Color(0xFF1A1A1A),
@@ -172,20 +188,31 @@ class _InboundScreenState extends State<InboundScreen> {
                 ),
               ),
 
-              // --- SECCIÓN 2: FORMULARIO DE LÍNEA (Agregar Productos) ---
+              // --- SECCIÓN 2: FORMULARIO MULTI-UNIDAD ---
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Form(
                   key: _lineaFormKey,
                   child: Column(
                     children: [
+                      _buildDropdown('Producto *', 'Buscar...', _productos, _productoActual, (v) => setState(() => _productoActual = v as int?)),
+                      const SizedBox(height: 12),
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(flex: 2, child: _buildDropdown('Producto *', 'Buscar...', _productos, _productoActual, (v) => setState(() => _productoActual = v as int?))),
+                          Expanded(child: _buildTextField('Cajas', '0', controller: _cajasController, isNumber: true, onChanged: (_) => setState(() {}))),
                           const SizedBox(width: 12),
-                          Expanded(flex: 1, child: _buildTextField('Cant. *', '0', controller: _cantidadController, isNumber: true, isRequired: true)),
+                          Expanded(child: _buildTextField('Piezas Sueltas', '0', controller: _piezasController, isNumber: true, onChanged: (_) => setState(() {}))),
                         ],
+                      ),
+                      const SizedBox(height: 8),
+                      // Etiqueta dinámica que muestra la matemática en tiempo real
+                      Container(
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          'Total a ingresar: ${_calcularTotalTemporal()} ${ _productoActual != null ? _productos.firstWhere((p) => p['id'] == _productoActual)['unidad_medida'] : ''}',
+                          style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
                       ),
                       const SizedBox(height: 12),
                       Row(
@@ -206,7 +233,7 @@ class _InboundScreenState extends State<InboundScreen> {
               ),
               const Divider(color: Colors.grey),
 
-              // --- SECCIÓN 3: EL CARRITO / LISTA DE ENTRADAS ---
+              // --- SECCIÓN 3: EL CARRITO CON DESGLOSE ---
               Expanded(
                 child: _listaEntradas.isEmpty
                   ? const Center(child: Text('La lista está vacía.\nAgrega productos arriba.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)))
@@ -217,14 +244,14 @@ class _InboundScreenState extends State<InboundScreen> {
                         return ListTile(
                           leading: CircleAvatar(backgroundColor: Colors.green.withValues(alpha: 0.2), child: Text('${index + 1}', style: const TextStyle(color: Colors.greenAccent))),
                           title: Text(item['nombre_producto'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Text('Cant: ${item['cantidad']} ${item['unidad']} | Lote: ${item['lote'] ?? 'N/A'}'),
+                          // Aquí mostramos el desglose exacto que pediste
+                          subtitle: Text('Cajas = ${item['cajas']} (${item['piezas_por_caja']}pz c/u), Piezas = ${item['piezas_sueltas']}\nTotal: ${item['cantidad']} ${item['unidad']} | Lote: ${item['lote'] ?? 'N/A'}'),
                           trailing: IconButton(icon: const Icon(Icons.delete_outline, color: Colors.redAccent), onPressed: () => _eliminarDeLaLista(index)),
                         );
                       },
                     ),
               ),
 
-              // --- BOTÓN FINAL DE GUARDAR ---
               Container(
                 padding: const EdgeInsets.all(16),
                 width: double.infinity,
@@ -241,8 +268,7 @@ class _InboundScreenState extends State<InboundScreen> {
     );
   }
 
-  // Widgets Reutilizables (Simplificados para encajar bien)
-  Widget _buildTextField(String label, String hint, {TextEditingController? controller, bool isNumber = false, bool isRequired = false}) {
+  Widget _buildTextField(String label, String hint, {TextEditingController? controller, bool isNumber = false, Function(String)? onChanged}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -251,7 +277,7 @@ class _InboundScreenState extends State<InboundScreen> {
         TextFormField(
           controller: controller,
           keyboardType: isNumber ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
-          validator: isRequired ? (v) => v!.isEmpty ? '*' : null : null,
+          onChanged: onChanged,
           decoration: InputDecoration(hintText: hint, filled: true, fillColor: const Color(0xFF2A2A2A), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none)),
         ),
       ],
@@ -266,7 +292,7 @@ class _InboundScreenState extends State<InboundScreen> {
         const SizedBox(height: 4),
         DropdownButtonFormField<int>(
           initialValue: selectedValue,
-          isExpanded: true, // Evita errores visuales si el nombre es muy largo
+          isExpanded: true, 
           decoration: InputDecoration(filled: true, fillColor: const Color(0xFF2A2A2A), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none)),
           hint: Text(hint),
           items: items.map((item) => DropdownMenuItem<int>(value: item['id'], child: Text(item['nombre']))).toList(),

@@ -34,7 +34,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
 
   // Las listas reales del almacén
   final List<String> _categorias = ['Materia Prima', 'Empaque', 'Harinas y Polvos', 'Mantecas y Lácteos', 'Complementos'];
-  final List<String> _unidades = ['Sacos', 'Kilos', 'Litros', 'Costales', 'Paquetes', 'Piezas', 'Rollos', 'Cajas', 'Bolsitas', 'Kits', 'Latas', 'Porrones'];
+  final List<String> _unidades = ['Sacos', 'Kilos', 'Litros', 'Costales', 'Paquetes', 'Piezas', 'Rollos', 'Cajas', 'Bolsitas', 'Kits', 'Latas', 'Bidones'];
 
   // Función asíncrona para inyectar a PostgreSQL
   Future<void> _guardarProducto() async {

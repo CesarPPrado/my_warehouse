@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../widgets/action_button.dart';
-import '../widgets/alert_card.dart'; // Importamos el nuevo widget
+import '../widgets/alert_card.dart'; 
 import 'inventory_screen.dart';
 import 'production_screen.dart';
 import 'inbound_screen.dart';
@@ -28,7 +28,7 @@ class HomeScreen extends StatelessWidget {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Abarrotes Del Prado', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24)),
+            const Text('La Sinaloa - Almacen', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24)),
             // Llamamos a la función aquí
             Text(_obtenerFechaActual(), style: const TextStyle(fontSize: 14, color: Colors.grey)),
           ],
@@ -69,7 +69,7 @@ class HomeScreen extends StatelessWidget {
                   title: 'Salida',
                   subtitle: '(Sucursal/Area)',
                   icon: Icons.arrow_circle_up,
-                  color: Colors.blue.shade700,
+                  color: Colors.red,
                   onTap: () {
                     Navigator.push(context, MaterialPageRoute(builder: (context) => const OutboundScreen()));
                   },
