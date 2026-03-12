@@ -15,6 +15,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nombreController = TextEditingController();
   final _stockMinimoController = TextEditingController(text: '5'); // 5 por defecto
+  final _piezasPorCajaController = TextEditingController();
   
   String? _categoriaSeleccionada;
   String? _unidadSeleccionada;
@@ -29,6 +30,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       _categoriaSeleccionada = widget.productoAEditar!['categoria'];
       _unidadSeleccionada = widget.productoAEditar!['unidad_medida'];
       _stockMinimoController.text = widget.productoAEditar!['stock_minimo'].toString();
+      _piezasPorCajaController.text = (widget.productoAEditar!['piezas_por_caja'] ?? 1).toString();
+      } else {
+      _piezasPorCajaController.text = '1'; // Por defecto es 1
     }
   }
 
@@ -43,6 +47,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     setState(() => _isLoading = true);
 
     try {
+      // Convertimos el texto del controlador a número (si está vacío, por defecto es 1)
+      final piezasCaja = int.tryParse(_piezasPorCajaController.text.trim()) ?? 1;
+
       if (widget.productoAEditar == null) {
         // MODO CREAR: Hacemos un INSERT normal
         await Supabase.instance.client.from('productos').insert({
@@ -50,7 +57,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
           'categoria': _categoriaSeleccionada,
           'unidad_medida': _unidadSeleccionada,
           'stock_minimo': int.parse(_stockMinimoController.text.trim()),
-          'stock_actual': 0, 
+          'stock_actual': 0,
+          'piezas_por_caja': piezasCaja,
         });
       } else {
         // MODO EDITAR: Hacemos un UPDATE usando el ID
@@ -59,6 +67,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
           'categoria': _categoriaSeleccionada,
           'unidad_medida': _unidadSeleccionada,
           'stock_minimo': int.parse(_stockMinimoController.text.trim()),
+          'piezas_por_caja': piezasCaja,
         }).eq('id', widget.productoAEditar!['id']);
       }
 
@@ -84,6 +93,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   void dispose() {
     _nombreController.dispose();
     _stockMinimoController.dispose();
+    _piezasPorCajaController.dispose();
     super.dispose();
   }
 
@@ -115,6 +125,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                 children: [
                   Expanded(child: _buildDropdown('Unidad de Medida *', 'Ej. Sacos', _unidades, (val) => _unidadSeleccionada = val, true)),
                   const SizedBox(width: 16),
+                  Expanded(child: _buildTextField('Piezas por caja/empaque *', 'Ej. 24 (Dejar en 1 si es granel)', controller: _piezasPorCajaController, isNumber: true, isRequired: true)),
+                  const SizedBox(height: 16),
                   Expanded(child: _buildTextField('Stock Mínimo (Alerta) *', '5', controller: _stockMinimoController, isNumber: true, isRequired: true)),
                 ],
               ),
