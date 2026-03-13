@@ -9,180 +9,194 @@ class InventoryScreen extends StatefulWidget {
 }
 
 class _InventoryScreenState extends State<InventoryScreen> {
-  // Canal de comunicación en tiempo real con Supabase
-  final _productosStream = Supabase.instance.client
-      .from('productos')
-      .stream(primaryKey: ['id'])
-      .order('nombre', ascending: true); // Los ordenamos alfabéticamente
+  List<dynamic> _productos = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarInventario();
+  }
+
+  Future<void> _cargarInventario() async {
+    try {
+      final data = await Supabase.instance.client
+          .from('productos')
+          .select('id, nombre, stock_actual, unidad_medida, categoria, familia, equivalencia_base, stock_minimo')
+          .order('nombre');
+
+      if (mounted) {
+        setState(() {
+          _productos = data;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error cargando inventario: $e');
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // --- EL MOTOR MATEMÁTICO ---
+  List<Map<String, dynamic>> _generarInventarioTotalizado() {
+    Map<String, double> totalesPorFamilia = {};
+    Map<String, String> unidadPorFamilia = {};
+
+    for (var p in _productos) {
+      // Si el producto no tiene familia, usamos su propio nombre para que no se pierda
+      String familia = (p['familia'] != null && p['familia'].toString().trim().isNotEmpty)
+          ? p['familia']
+          : p['nombre'];
+
+      double stockFisico = (p['stock_actual'] ?? 0).toDouble();
+      double equivalencia = (p['equivalencia_base'] ?? 1).toDouble();
+      
+      // LA MULTIPLICACIÓN MÁGICA
+      double totalConvertido = stockFisico * equivalencia;
+
+      // Sumamos al acumulador de esa familia
+      totalesPorFamilia[familia] = (totalesPorFamilia[familia] ?? 0) + totalConvertido;
+
+      // Intentamos capturar la "Unidad Base" (Ej. Litros o Kilos)
+      // Buscamos el producto hermano que tenga equivalencia = 1 (que es el granel)
+      if (equivalencia == 1.0 || !unidadPorFamilia.containsKey(familia)) {
+        unidadPorFamilia[familia] = p['unidad_medida'] ?? '';
+      }
+    }
+
+    // Convertimos el diccionario a una lista para poder mostrarla en pantalla
+    List<Map<String, dynamic>> listaTotalizada = [];
+    totalesPorFamilia.forEach((familia, total) {
+      listaTotalizada.add({
+        'familia': familia,
+        'total': total,
+        'unidad': unidadPorFamilia[familia] ?? '',
+      });
+    });
+
+    // Ordenamos alfabéticamente
+    listaTotalizada.sort((a, b) => a['familia'].compareTo(b['familia']));
+    
+    return listaTotalizada;
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Inventario General', style: TextStyle(fontWeight: FontWeight.bold)),
-        centerTitle: true,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            // Barra de Búsqueda (Visual por ahora)
-            TextField(
-              decoration: InputDecoration(
-                hintText: 'Buscar producto...',
-                prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.qr_code_scanner, color: Colors.greenAccent),
-                  onPressed: () { debugPrint("Abrir cámara"); },
-                ),
-                filled: true,
-                fillColor: const Color(0xFF1A1A1A),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-              ),
-            ),
-            const SizedBox(height: 16),
+    // Generamos la lista matemática antes de dibujar la pantalla
+    final listaTotalizada = _generarInventarioTotalizado();
 
-            // Pestañas de Categorías
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
+    // DefaultTabController es lo que nos permite tener pestañas navegables
+    return DefaultTabController(
+      length: 2, // Número de pestañas
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Inventario General', style: TextStyle(fontWeight: FontWeight.bold)),
+          backgroundColor: Colors.orange.shade800,
+          bottom: const TabBar(
+            indicatorColor: Colors.white,
+            indicatorWeight: 4,
+            tabs: [
+              Tab(icon: Icon(Icons.inventory_2_outlined), text: 'Físico (Sacos/Bultos Completos)'),
+              Tab(icon: Icon(Icons.calculate_outlined), text: 'Totalizado (KG/L/PZ Granel)'),
+            ],
+          ),
+        ),
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : TabBarView(
                 children: [
-                  _buildFilterChip('Todos', true),
-                  _buildFilterChip('Batida', false),
-                  _buildFilterChip('Empaque', false),
-                  _buildFilterChip('Frijoles', false),
+                  // --- PESTAÑA 1: INVENTARIO FÍSICO ---
+                  _buildListaFisico(),
+
+                  // --- PESTAÑA 2: INVENTARIO TOTALIZADO ---
+                  _buildListaTotalizada(listaTotalizada),
                 ],
               ),
-            ),
-            const SizedBox(height: 16),
-
-            // Escuchando a PostgreSQL
-            Expanded(
-              child: StreamBuilder<List<Map<String, dynamic>>>(
-                stream: _productosStream,
-                builder: (context, snapshot) {
-                  // Mientras carga la primera vez
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator(color: Colors.greenAccent));
-                  }
-                  
-                  // Si hay algún error de conexión
-                  if (snapshot.hasError) {
-                    return Center(child: Text('Error de conexión: ${snapshot.error}', style: const TextStyle(color: Colors.red)));
-                  }
-
-                  final productos = snapshot.data ?? [];
-
-                  // Si la base de datos está vacía
-                  if (productos.isEmpty) {
-                    return const Center(child: Text('No hay productos en el inventario', style: TextStyle(color: Colors.grey)));
-                  }
-
-                  // Mostramos la lista real
-                  return ListView.builder(
-                    itemCount: productos.length,
-                    itemBuilder: (context, index) {
-                      final p = productos[index];
-                      
-                      // Lógica de inventario inteligente
-                      final num stockActual = p['stock_actual'];
-                      final num stockMinimo = p['stock_minimo'];
-                      
-                      String statusText;
-                      Color statusColor;
-
-                      if (stockActual == 0) {
-                        statusText = 'AGOTADO';
-                        statusColor = Colors.redAccent;
-                      } else if (stockActual <= stockMinimo) {
-                        statusText = 'BAJO';
-                        statusColor = Colors.amber;
-                      } else {
-                        statusText = 'OK';
-                        statusColor = Colors.green;
-                      }
-
-                      return ProductListCard(
-                        name: p['nombre'],
-                        category: p['categoria'],
-                        stock: '$stockActual ${p['unidad_medida']}',
-                        status: statusText,
-                        statusColor: statusColor,
-                      );
-                    },
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
 
-  Widget _buildFilterChip(String label, bool isSelected) {
-    return Container(
-      margin: const EdgeInsets.only(right: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: isSelected ? Colors.green.shade600 : const Color(0xFF2A2A2A),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(label, style: TextStyle(color: isSelected ? Colors.white : Colors.grey.shade400, fontWeight: FontWeight.bold)),
-    );
-  }
-}
+  // Widget para la Pestaña 1 (Físico)
+  Widget _buildListaFisico() {
+    if (_productos.isEmpty) {
+      return const Center(child: Text('No hay productos en el catálogo.', style: TextStyle(color: Colors.grey)));
+    }
 
-// El mismo widget de tarjeta que ya teniamos
-class ProductListCard extends StatelessWidget {
-  final String name;
-  final String category;
-  final String stock;
-  final String status;
-  final Color statusColor;
+    return ListView.builder(
+      padding: const EdgeInsets.all(12),
+      itemCount: _productos.length,
+      itemBuilder: (context, index) {
+        final item = _productos[index];
+        final num stock = item['stock_actual'] ?? 0;
+        final num minimo = item['stock_minimo'] ?? 0;
 
-  const ProductListCard({
-    super.key, required this.name, required this.category, required this.stock, required this.status, required this.statusColor,
-  });
+        // Lógica de colores para alertas visuales rápidas
+        Color colorStock = Colors.white;
+        if (stock <= 0) {
+          colorStock = Colors.redAccent;
+        } else if (minimo > 0 && stock <= minimo) {
+          colorStock = Colors.orangeAccent;
+        }
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: const Color(0xFF1A1A1A), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white10)),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        return Card(
+          color: const Color(0xFF1A1A1A),
+          margin: const EdgeInsets.only(bottom: 8),
+          child: ListTile(
+            title: Text(item['nombre'], style: const TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Text('Categoría: ${item['categoria'] ?? 'N/A'}'),
+            trailing: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                const SizedBox(height: 4),
-                Text('Categoría: $category', style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(Icons.circle, size: 12, color: statusColor),
-                    const SizedBox(width: 6),
-                    Text(stock, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  ],
-                ),
+                Text('$stock', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: colorStock)),
+                Text(item['unidad_medida'] ?? '', style: const TextStyle(fontSize: 12, color: Colors.grey)),
               ],
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: statusColor.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: statusColor.withValues(alpha: 0.5)),
-            ),
-            child: Text(status, style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold)),
+        );
+      },
+    );
+  }
+
+  // Widget para la Pestaña 2 (Totalizado)
+  Widget _buildListaTotalizada(List<Map<String, dynamic>> lista) {
+    if (lista.isEmpty) {
+      return const Center(child: Text('No hay datos para totalizar.', style: TextStyle(color: Colors.grey)));
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(12),
+      itemCount: lista.length,
+      itemBuilder: (context, index) {
+        final item = lista[index];
+        
+        // Formateamos el número para que si es exacto (ej. 120.0) se vea como 120, pero si tiene decimales (ej 364.8) se vean
+        String totalFormateado = item['total'].toString();
+        if (totalFormateado.endsWith('.0')) {
+          totalFormateado = totalFormateado.substring(0, totalFormateado.length - 2);
+        }
+
+        return Card(
+          color: const Color(0xFF1A1A1A),
+          margin: const EdgeInsets.only(bottom: 8),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+            side: const BorderSide(color: Colors.green, width: 0.5), // Un borde verde para diferenciar que esta es la vista matemática
           ),
-        ],
-      ),
+          child: ListTile(
+            leading: const CircleAvatar(
+              backgroundColor: Colors.green,
+              child: Icon(Icons.functions, color: Colors.white),
+            ),
+            title: Text(item['familia'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            subtitle: const Text('Suma total de todos los empaques', style: TextStyle(color: Colors.grey, fontSize: 12)),
+            trailing: Text(
+              '$totalFormateado ${item['unidad']}', 
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.greenAccent)
+            ),
+          ),
+        );
+      },
     );
   }
 }

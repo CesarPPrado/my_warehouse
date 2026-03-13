@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class RecipeFormScreen extends StatefulWidget {
-  final Map<String, dynamic>? recetaAEditar; // <--- LA MAGIA PARA EDITAR
+  final Map<String, dynamic>? recetaAEditar; // Para editar recetas existentes
 
   const RecipeFormScreen({super.key, this.recetaAEditar});
 
@@ -96,7 +96,7 @@ class _RecipeFormScreenState extends State<RecipeFormScreen> {
 
       // MODO CREAR
       if (widget.recetaAEditar == null) {
-        // Escudo Anti-Duplicados
+        // Anti-Duplicados
         final existe = await Supabase.instance.client.from('productos').select('id').ilike('nombre', nombreNuevoKit).maybeSingle();
         if (existe != null) throw '¡Ese Kit ya existe en el catálogo!';
 
@@ -111,7 +111,7 @@ class _RecipeFormScreenState extends State<RecipeFormScreen> {
         final idReceta = widget.recetaAEditar!['id'];
         final idProductoResultante = widget.recetaAEditar!['producto_resultante_id'];
 
-        // Escudo Anti-Duplicados (Permitiendo el mismo nombre si es el mismo producto)
+        // Anti-Duplicados (Permitiendo el mismo nombre si es el mismo producto)
         final existe = await Supabase.instance.client.from('productos').select('id').ilike('nombre', nombreNuevoKit).neq('id', idProductoResultante).maybeSingle();
         if (existe != null) throw 'Ya existe otro producto con ese nombre';
 
@@ -119,7 +119,7 @@ class _RecipeFormScreenState extends State<RecipeFormScreen> {
         await Supabase.instance.client.from('productos').update({'nombre': nombreNuevoKit, 'tipo_articulo': _tipoSeleccionado}).eq('id', idProductoResultante);
         await Supabase.instance.client.from('recetas').update({'tipo_receta': _tipoSeleccionado}).eq('id', idReceta);
 
-        // El truco de ingeniero para actualizar ingredientes: Borrar todos y volver a insertar la nueva lista
+        // Actualizar ingredientes: Borrar todos y volver a insertar la nueva lista
         await Supabase.instance.client.from('receta_ingredientes').delete().eq('receta_id', idReceta);
         List<Map<String, dynamic>> lineas = _ingredientes.map((ing) => {'receta_id': idReceta, 'producto_origen_id': ing['producto_id'], 'cantidad_requerida': ing['cantidad']}).toList();
         await Supabase.instance.client.from('receta_ingredientes').insert(lineas);

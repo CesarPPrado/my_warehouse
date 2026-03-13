@@ -175,7 +175,7 @@ class _InboundScreenState extends State<InboundScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Datos del Documento', style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold)),
+                    const Text('Datos de la nota del proveedor', style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 12),
                     Row(
                       children: [
@@ -200,9 +200,9 @@ class _InboundScreenState extends State<InboundScreen> {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(child: _buildTextField('Cajas', '0', controller: _cajasController, isNumber: true, onChanged: (_) => setState(() {}))),
+                          Expanded(child: _buildTextField('Costales/Bidones/Cajas/Etc.', '0', controller: _cajasController, isNumber: true, onChanged: (_) => setState(() {}))),
                           const SizedBox(width: 12),
-                          Expanded(child: _buildTextField('Piezas Sueltas', '0', controller: _piezasController, isNumber: true, onChanged: (_) => setState(() {}))),
+                          Expanded(child: _buildTextField('KG/L/PZ/Latas/Etc.', '0', controller: _piezasController, isNumber: true, onChanged: (_) => setState(() {}))),
                         ],
                       ),
                       const SizedBox(height: 8),
