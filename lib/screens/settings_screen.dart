@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'manage_products_screen.dart';
 import 'manage_locations_screen.dart';
+import 'manage_recipes_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -24,8 +25,8 @@ class SettingsScreen extends StatelessWidget {
           _buildSettingsCard(context, Icons.storefront, 'Gestionar Sucursales', 'Configurar puntos de distribución', Colors.blue, const ManageLocationsScreen(titulo: 'Sucursales y Bodegas', esProveedor: false)),
           
           // Pantalla 2: Solo Proveedores (Morado)
-          _buildSettingsCard(context, Icons.people, 'Gestionar Proveedores', 'Administrar contactos y tiempos', Colors.purple, const ManageLocationsScreen(titulo: 'Proveedores Externos', esProveedor: true)),
-          _buildSettingsCard(context, Icons.science, 'Fórmulas y Recetas', 'Configurar pasajes y compuestos', Colors.orange, null),
+          _buildSettingsCard(context, Icons.people, 'Gestionar Proveedores', 'Administrar contactos', Colors.purple, const ManageLocationsScreen(titulo: 'Proveedores Externos', esProveedor: true)),
+          _buildSettingsCard(context, Icons.science, 'Fórmulas y Recetas', 'Configurar pesajes y compuestos', Colors.orange, const ManageRecipesScreen()),
           
           const SizedBox(height: 32),
           const Text('Ajustes del Sistema', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey)),
