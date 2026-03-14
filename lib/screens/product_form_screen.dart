@@ -25,7 +25,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   String? _categoriaSeleccionada;
   String? _unidadSeleccionada;
 
-  final List<String> _categorias = ['Materia Prima', 'Producción', 'Empaque', 'Limpieza', 'Mantenimiento', 'Otros'];
+  final List<String> _categorias = ['Materia Prima', 'Producción', 'Empaque', 'Limpieza', 'Mantenimiento', 'Otros',  'Complementos', 'Harinas y Polvos'];
   final List<String> _unidades = ['Kilos', 'Gramos', 'Litros', 'Sacos', 'Bolsas', 'Costales', 'Piezas', 'Cajas', 'Bidones', 'Latas'];
 
   @override
@@ -66,8 +66,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
           'stock_minimo': int.parse(_stockMinimoController.text.trim()),
           'stock_actual': 0,
           'piezas_por_caja': piezasCaja,
-          'familia': familiaStr, // <--- GUARDAR EN BASE DE DATOS
-          'equivalencia_base': equivalencia, // <--- GUARDAR EN BASE DE DATOS
+          'familia': familiaStr,
+          'equivalencia_base': equivalencia,
         });
       } else {
         await Supabase.instance.client.from('productos').update({
@@ -76,8 +76,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
           'unidad_medida': _unidadSeleccionada,
           'stock_minimo': int.parse(_stockMinimoController.text.trim()),
           'piezas_por_caja': piezasCaja,
-          'familia': familiaStr, // <--- ACTUALIZAR EN BASE DE DATOS
-          'equivalencia_base': equivalencia, // <--- ACTUALIZAR EN BASE DE DATOS
+          'familia': familiaStr,
+          'equivalencia_base': equivalencia,
         }).eq('id', widget.productoAEditar!['id']);
       }
 
@@ -129,7 +129,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
               _buildTextField('Piezas por caja/empaque *', 'Ej. 24 (Dejar en 1 si es granel)', controller: _piezasPorCajaController, isNumber: true, isRequired: true),
               const SizedBox(height: 24),
               
-              // --- SECCIÓN DE AGRUPACIÓN (NUEVA) ---
+              // --- SECCIÓN DE AGRUPACIÓN ---
               const Divider(color: Colors.grey),
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 8.0),

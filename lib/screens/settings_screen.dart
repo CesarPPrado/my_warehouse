@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'manage_products_screen.dart';
 import 'manage_locations_screen.dart';
 import 'manage_recipes_screen.dart';
+import 'package:my_warehouse/screens/manage_providers_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -22,10 +23,10 @@ class SettingsScreen extends StatelessWidget {
           _buildSettingsCard(context, Icons.inventory_2, 'Gestionar Productos', 'Agregar, editar o eliminar insumos del catálogo', Colors.green, const ManageProductsScreen()),
 
           // Pantalla 1: Solo Sucursales (Azul)
-          _buildSettingsCard(context, Icons.storefront, 'Gestionar Sucursales', 'Configurar puntos de distribución', Colors.blue, const ManageLocationsScreen(titulo: 'Sucursales y Bodegas', esProveedor: false)),
+          _buildSettingsCard(context, Icons.storefront, 'Gestionar Sucursales', 'Configurar puntos de distribución', Colors.blue, const ManageLocationsScreen()),
           
           // Pantalla 2: Solo Proveedores (Morado)
-          _buildSettingsCard(context, Icons.people, 'Gestionar Proveedores', 'Administrar contactos', Colors.purple, const ManageLocationsScreen(titulo: 'Proveedores Externos', esProveedor: true)),
+          _buildSettingsCard(context, Icons.people, 'Gestionar Proveedores', 'Administrar catálogo de proveedores', Colors.purple, const ManageProvidersScreen()),
           _buildSettingsCard(context, Icons.science, 'Fórmulas y Recetas', 'Configurar pesajes y compuestos', Colors.orange, const ManageRecipesScreen()),
           
           const SizedBox(height: 32),
@@ -35,14 +36,6 @@ class SettingsScreen extends StatelessWidget {
           _buildSettingsCard(context, Icons.security, 'Usuarios y Permisos', 'Controlar quién puede registrar movimientos', Colors.grey, null),
           _buildSettingsCard(context, Icons.print, 'Impresoras Térmicas', 'Configurar impresión de tickets y etiquetas', Colors.grey, null),
         ],
-      ),
-      // Botón flotante para agregar nuevos registros rápidamente
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          debugPrint('Abrir modal para agregar nuevo registro');
-        },
-        backgroundColor: Colors.greenAccent,
-        child: const Icon(Icons.add, color: Colors.black, size: 30),
       ),
     );
   }

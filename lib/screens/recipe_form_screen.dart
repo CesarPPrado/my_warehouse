@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class RecipeFormScreen extends StatefulWidget {
-  final Map<String, dynamic>? recetaAEditar; // Para editar recetas existentes
+  final Map<String, dynamic>? recetaAEditar;
 
   const RecipeFormScreen({super.key, this.recetaAEditar});
 
@@ -17,8 +17,9 @@ class _RecipeFormScreenState extends State<RecipeFormScreen> {
 
   int? _ingredienteActual;
   final _cantidadController = TextEditingController();
-  List<Map<String, dynamic>> _ingredientes = [];
+  final _buscadorIngredienteController = TextEditingController(); // <--- EL NUEVO CONTROLADOR
 
+  List<Map<String, dynamic>> _ingredientes = [];
   List<dynamic> _productos = [];
   bool _isLoading = false;
 
@@ -34,20 +35,16 @@ class _RecipeFormScreenState extends State<RecipeFormScreen> {
     try {
       final prods = await Supabase.instance.client.from('productos').select('id, nombre, unidad_medida').order('nombre');
       
-      // Si estamos editando, cargamos la información que ya existía
       if (widget.recetaAEditar != null) {
         _tipoSeleccionado = widget.recetaAEditar!['tipo_receta'];
         _productoResultanteController.text = widget.recetaAEditar!['nombre_producto'];
 
-        // Traemos los ingredientes actuales de esta receta
         final ingData = await Supabase.instance.client.from('receta_ingredientes').select().eq('receta_id', widget.recetaAEditar!['id']);
         
         List<Map<String, dynamic>> ingsCargados = [];
         for (var row in ingData) {
-          // Buscamos la posición del producto en la lista
           final pIndex = prods.indexWhere((p) => p['id'] == row['producto_origen_id']);
-          
-          if (pIndex != -1) { // Si no es -1, significa que SÍ lo encontró
+          if (pIndex != -1) {
             final pInfo = prods[pIndex];
             ingsCargados.add({
               'producto_id': pInfo['id'],
@@ -77,8 +74,11 @@ class _RecipeFormScreenState extends State<RecipeFormScreen> {
     final prodInfo = _productos.firstWhere((p) => p['id'] == _ingredienteActual);
     setState(() {
       _ingredientes.add({'producto_id': _ingredienteActual, 'nombre': prodInfo['nombre'], 'unidad': prodInfo['unidad_medida'], 'cantidad': cantidad});
+      
+      // Limpiamos los campos para el siguiente ingrediente
       _ingredienteActual = null;
       _cantidadController.clear();
+      _buscadorIngredienteController.clear(); 
     });
   }
 
@@ -94,9 +94,7 @@ class _RecipeFormScreenState extends State<RecipeFormScreen> {
     try {
       final nombreNuevoKit = _productoResultanteController.text.trim();
 
-      // MODO CREAR
       if (widget.recetaAEditar == null) {
-        // Anti-Duplicados
         final existe = await Supabase.instance.client.from('productos').select('id').ilike('nombre', nombreNuevoKit).maybeSingle();
         if (existe != null) throw '¡Ese Kit ya existe en el catálogo!';
 
@@ -105,21 +103,16 @@ class _RecipeFormScreenState extends State<RecipeFormScreen> {
         
         List<Map<String, dynamic>> lineas = _ingredientes.map((ing) => {'receta_id': recetaInsertada['id'], 'producto_origen_id': ing['producto_id'], 'cantidad_requerida': ing['cantidad']}).toList();
         await Supabase.instance.client.from('receta_ingredientes').insert(lineas);
-      } 
-      // MODO EDITAR
-      else {
+      } else {
         final idReceta = widget.recetaAEditar!['id'];
         final idProductoResultante = widget.recetaAEditar!['producto_resultante_id'];
 
-        // Anti-Duplicados (Permitiendo el mismo nombre si es el mismo producto)
         final existe = await Supabase.instance.client.from('productos').select('id').ilike('nombre', nombreNuevoKit).neq('id', idProductoResultante).maybeSingle();
         if (existe != null) throw 'Ya existe otro producto con ese nombre';
 
-        // Actualizamos nombre y tipo
         await Supabase.instance.client.from('productos').update({'nombre': nombreNuevoKit, 'tipo_articulo': _tipoSeleccionado}).eq('id', idProductoResultante);
         await Supabase.instance.client.from('recetas').update({'tipo_receta': _tipoSeleccionado}).eq('id', idReceta);
 
-        // Actualizar ingredientes: Borrar todos y volver a insertar la nueva lista
         await Supabase.instance.client.from('receta_ingredientes').delete().eq('receta_id', idReceta);
         List<Map<String, dynamic>> lineas = _ingredientes.map((ing) => {'receta_id': idReceta, 'producto_origen_id': ing['producto_id'], 'cantidad_requerida': ing['cantidad']}).toList();
         await Supabase.instance.client.from('receta_ingredientes').insert(lineas);
@@ -140,6 +133,7 @@ class _RecipeFormScreenState extends State<RecipeFormScreen> {
   void dispose() {
     _productoResultanteController.dispose();
     _cantidadController.dispose();
+    _buscadorIngredienteController.dispose();
     super.dispose();
   }
 
@@ -172,7 +166,20 @@ class _RecipeFormScreenState extends State<RecipeFormScreen> {
                     const Text('Los materiales que selecciones aquí, se descontarán del inventario cuando se fabrique.', style: TextStyle(color: Colors.grey, fontSize: 12, fontStyle: FontStyle.italic)),
                     const SizedBox(height: 16),
                     Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Expanded(flex: 2, child: _buildDropdown('Ingrediente', 'Buscar...', _productos, _ingredienteActual, (v) => setState(() => _ingredienteActual = v as int?))),
+                        
+                        // --- AQUÍ ESTÁ EL NUEVO BUSCADOR IMPLEMENTADO ---
+                        Expanded(
+                          flex: 2, 
+                          child: _buildSearchableDropdown(
+                            'Ingrediente', 
+                            'Escribe o selecciona un producto...', 
+                            _productos, 
+                            _ingredienteActual, 
+                            _buscadorIngredienteController, 
+                            (v) => setState(() => _ingredienteActual = v as int?)
+                          )
+                        ),
+                        
                         const SizedBox(width: 12),
                         Expanded(flex: 1, child: _buildTextField('Cant.', '0', controller: _cantidadController, isNumber: true)),
                       ],
@@ -196,11 +203,50 @@ class _RecipeFormScreenState extends State<RecipeFormScreen> {
     );
   }
 
+  // --- WIDGETS REUTILIZABLES AL FINAL DEL ARCHIVO ---
+
   Widget _buildTextField(String label, String hint, {TextEditingController? controller, bool isNumber = false, bool isRequired = false}) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)), const SizedBox(height: 4), TextFormField(controller: controller, keyboardType: isNumber ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text, validator: isRequired ? (v) => v!.isEmpty ? 'Requerido' : null : null, decoration: InputDecoration(hintText: hint, filled: true, fillColor: const Color(0xFF2A2A2A), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none)))]);
   }
 
   Widget _buildDropdown(String label, String hint, List<dynamic> items, dynamic selectedValue, Function(dynamic) onChanged, {bool isString = false}) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)), const SizedBox(height: 4), DropdownButtonFormField<dynamic>(initialValue: selectedValue, isExpanded: true, decoration: InputDecoration(filled: true, fillColor: const Color(0xFF2A2A2A), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none)), hint: Text(hint), items: items.map((item) { final value = isString ? item : item['id']; final text = isString ? item : item['nombre']; return DropdownMenuItem<dynamic>(value: value, child: Text(text)); }).toList(), onChanged: onChanged)]);
+  }
+
+  // EL NUEVO WIDGET BUSCADOR
+  Widget _buildSearchableDropdown(String label, String hint, List<dynamic> items, dynamic selectedValue, TextEditingController controller, Function(dynamic) onChanged) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+        const SizedBox(height: 4),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            return DropdownMenu<dynamic>(
+              controller: controller,
+              width: constraints.maxWidth, 
+              menuHeight: 250, 
+              enableFilter: true, 
+              hintText: hint,
+              initialSelection: selectedValue,
+              textStyle: const TextStyle(fontSize: 14),
+              inputDecorationTheme: InputDecorationTheme(
+                filled: true,
+                fillColor: const Color(0xFF2A2A2A),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+              ),
+              dropdownMenuEntries: items.map((item) {
+                return DropdownMenuEntry<dynamic>(
+                  value: item['id'],
+                  label: item['nombre'],
+                );
+              }).toList(),
+              onSelected: onChanged,
+            );
+          }
+        ),
+      ],
+    );
   }
 }
