@@ -122,13 +122,12 @@ class _InboundScreenState extends State<InboundScreen> {
       for (var item in _productosAgregados) {
         // 1. Registrar movimiento
         await Supabase.instance.client.from('movimientos').insert({
-          'tipo': 'Entrada',
+          'tipo_movimiento': 'Entrada',
           'producto_id': item['producto_id'],
           'cantidad': item['cantidad_total'],
-          'proveedor_id': _proveedorSeleccionado,
+          'origen_id': _proveedorSeleccionado,
           'factura': factura.isEmpty ? null : factura,
           'lote': item['lote'].toString().isEmpty ? null : item['lote'],
-          'fecha': DateTime.now().toIso8601String(),
         });
 
         // 2. Actualizar stock

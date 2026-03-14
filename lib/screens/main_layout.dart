@@ -14,7 +14,7 @@ class _MainLayoutState extends State<MainLayout> {
   int _currentIndex = 0; // Controla qué pestaña está activa
 
   // Lista de las 4 pantallas principales
-  final List<Widget> _screens = const [
+  final List<Widget> _screens = [
     HomeScreen(),
     HistoryScreen(),
     SettingsScreen(),

@@ -9,282 +9,271 @@ class OutboundScreen extends StatefulWidget {
 }
 
 class _OutboundScreenState extends State<OutboundScreen> {
-  // --- ENCABEZADO ---
-  int? _destinoSeleccionado;
-  final _referenciaController = TextEditingController();
-  int? _idAlmacenProduccion; // El origen por defecto
-
-  // --- LÍNEA ---
-  final _lineaFormKey = GlobalKey<FormState>();
-  int? _productoActual;
+  List<dynamic> _sucursales = [];
+  List<dynamic> _productos = [];
+  
+  dynamic _sucursalSeleccionada;
+  final _motivoController = TextEditingController();
+  
+  dynamic _productoSeleccionado;
   final _cajasController = TextEditingController();
   final _piezasController = TextEditingController();
+  
+  // --- CONTROLADORES DEL BUSCADOR ---
+  final _buscadorSucursalController = TextEditingController();
+  final _buscadorProductoController = TextEditingController();
 
-  final List<Map<String, dynamic>> _listaSalidas = [];
-  List<dynamic> _productos = [];
-  List<dynamic> _sucursalesDestino = [];
-  bool _isLoading = false;
+  final List<Map<String, dynamic>> _productosAgregados = [];
+  bool _isLoading = true;
+  bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
-    _cargarCatalogos();
+    _cargarDatos();
   }
 
-  Future<void> _cargarCatalogos() async {
+  Future<void> _cargarDatos() async {
     try {
-      // Solo traemos productos que tengan stock > 0 para no llenar la lista de basura
-      final prods = await Supabase.instance.client.from('productos').select('id, nombre, stock_actual, unidad_medida, piezas_por_caja').gt('stock_actual', 0).order('nombre');
+      final sucData = await Supabase.instance.client.from('sucursales').select('id, nombre, tipo').order('nombre');
+      final prodData = await Supabase.instance.client.from('productos').select('id, nombre, unidad_medida, piezas_por_caja, stock_actual').order('nombre');
       
-      // Traemos las sucursales a las que les podemos despachar
-      final sucs = await Supabase.instance.client.from('sucursales').select('id, nombre').inFilter('tipo', ['Sucursal', 'Bodega']).order('nombre');
-      
-      // Buscamos de dónde sale la mercancía por defecto
-      final origen = await Supabase.instance.client.from('sucursales').select('id').eq('nombre', 'Almacen Produccion').maybeSingle();
-
       if (mounted) {
         setState(() {
-          _productos = prods;
-          _sucursalesDestino = sucs;
-          _idAlmacenProduccion = origen != null ? origen['id'] : null; 
+          _sucursales = sucData;
+          _productos = prodData;
+          _isLoading = false;
         });
       }
     } catch (e) {
       debugPrint('Error: $e');
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  int _calcularTotalTemporal() {
-    if (_productoActual == null) return 0;
-    final prodInfo = _productos.firstWhere((p) => p['id'] == _productoActual);
-    final int ppc = (prodInfo['piezas_por_caja'] ?? 1).toInt();
+  void _agregarALista() {
+    if (_productoSeleccionado == null) return;
+
+    final pIndex = _productos.indexWhere((p) => p['id'] == _productoSeleccionado);
+    if (pIndex == -1) return;
+    
+    final pInfo = _productos[pIndex];
     
     final cajas = int.tryParse(_cajasController.text.trim()) ?? 0;
-    final piezas = int.tryParse(_piezasController.text.trim()) ?? 0;
+    final piezas = double.tryParse(_piezasController.text.trim()) ?? 0;
     
-    return ((cajas * ppc) + piezas).toInt();
-  }
+    if (cajas == 0 && piezas == 0) return;
 
-  void _agregarALaLista() {
-    if (!_lineaFormKey.currentState!.validate()) return;
-    if (_productoActual == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Selecciona un producto'), backgroundColor: Colors.orange));
+    final pxc = (pInfo['piezas_por_caja'] ?? 1) as num;
+    final totalASacar = (cajas * pxc) + piezas;
+    final stockActual = (pInfo['stock_actual'] ?? 0) as num;
+
+    // --- CANDADO DE SEGURIDAD (No sacar más de lo que hay) ---
+    if (totalASacar > stockActual) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('⚠️ Stock Insuficiente\nIntentas sacar $totalASacar pero solo tienes $stockActual ${pInfo['unidad_medida']}.', style: const TextStyle(height: 1.5)), 
+        backgroundColor: Colors.redAccent,
+        duration: const Duration(seconds: 4),
+      ));
       return;
     }
 
-    final totalCalculado = _calcularTotalTemporal();
-    if (totalCalculado <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ingresa una cantidad mayor a 0'), backgroundColor: Colors.orange));
-      return;
-    }
-
-    final prodInfo = _productos.firstWhere((p) => p['id'] == _productoActual);
-    final stockActual = (prodInfo['stock_actual'] ?? 0).toInt();
-
-    // --- REGLA DE NEGOCIO: PREVENIR INVENTARIO NEGATIVO ---
-    // Calculamos si ya tenemos este producto en el carrito para sumar lo que ya apartamos
-    int cantidadYaEnCarrito = 0;
-    for (var item in _listaSalidas) {
-      if (item['producto_id'] == _productoActual) {
-        cantidadYaEnCarrito += (item['cantidad'] as num).toInt();
-      }
-    }
-
-    if ((totalCalculado + cantidadYaEnCarrito) > stockActual) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('¡Stock insuficiente! Solo tienes $stockActual disponibles.'), backgroundColor: Colors.red),
-      );
-      return;
-    }
-
-    final cajas = int.tryParse(_cajasController.text.trim()) ?? 0;
-    final piezas = int.tryParse(_piezasController.text.trim()) ?? 0;
-    final int ppc = (prodInfo['piezas_por_caja'] ?? 1).toInt();
-    
     setState(() {
-      _listaSalidas.add({
-        'producto_id': _productoActual,
-        'nombre_producto': prodInfo['nombre'],
-        'unidad': prodInfo['unidad_medida'],
-        'stock_previo': stockActual,
-        'cajas': cajas,
-        'piezas_sueltas': piezas,
-        'piezas_por_caja': ppc,
-        'cantidad': totalCalculado,
+      _productosAgregados.add({
+        'producto_id': pInfo['id'],
+        'nombre': pInfo['nombre'],
+        'unidad': pInfo['unidad_medida'],
+        'cantidad_total': totalASacar,
+        'stock_despues': stockActual - totalASacar,
       });
-      
-      _productoActual = null;
+
+      // Limpieza automática
+      _productoSeleccionado = null;
       _cajasController.clear();
       _piezasController.clear();
+      _buscadorProductoController.clear();
     });
   }
 
-  void _eliminarDeLaLista(int index) {
-    setState(() => _listaSalidas.removeAt(index));
+  void _eliminarDeLista(int index) {
+    setState(() => _productosAgregados.removeAt(index));
   }
 
-  Future<void> _guardarSalidaMasiva() async {
-    if (_destinoSeleccionado == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Falta seleccionar la Sucursal de Destino'), backgroundColor: Colors.red));
+  Future<void> _confirmarSalida() async {
+    if (_sucursalSeleccionada == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Selecciona el destino', style: TextStyle(fontWeight: FontWeight.bold)), backgroundColor: Colors.orange));
       return;
     }
-    if (_listaSalidas.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Agrega al menos un producto a despachar'), backgroundColor: Colors.red));
+    if (_productosAgregados.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Agrega al menos un producto', style: TextStyle(fontWeight: FontWeight.bold)), backgroundColor: Colors.orange));
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() => _isSaving = true);
 
     try {
-      final referencia = _referenciaController.text.trim().isEmpty ? null : _referenciaController.text.trim();
+      final motivo = _motivoController.text.trim();
       
-      List<Map<String, dynamic>> movimientosAInsertar = _listaSalidas.map((item) {
-        return {
-          'tipo_movimiento': 'Salida', // Marcamos como salida
+      for (var item in _productosAgregados) {
+        // 1. Guardar en el historial de Movimientos
+        await Supabase.instance.client.from('movimientos').insert({
+          'tipo_movimiento': 'Salida',
           'producto_id': item['producto_id'],
-          'cantidad': item['cantidad'],
-          'factura': referencia,
-          'origen_id': _idAlmacenProduccion, // Sale del almacén principal
-          'destino_id': _destinoSeleccionado, // Va hacia la sucursal
-        };
-      }).toList();
+          'cantidad': item['cantidad_total'], // Lo guardamos en positivo, el 'tipo' dice qué es
+          'sucursal_id': _sucursalSeleccionada,
+          'motivo': motivo.isEmpty ? 'Traspaso/Despacho' : motivo,
+        });
 
-      await Supabase.instance.client.from('movimientos').insert(movimientosAInsertar);
-
-      // RESTAMOS EL STOCK MATEMÁTICAMENTE
-      for (var item in _listaSalidas) {
-        final nuevoStock = item['stock_previo'] - item['cantidad'];
-        await Supabase.instance.client.from('productos').update({'stock_actual': nuevoStock}).eq('id', item['producto_id']);
+        // 2. Restar del Stock
+        final pIndex = _productos.indexWhere((p) => p['id'] == item['producto_id']);
+        if (pIndex != -1) {
+          final pInfo = _productos[pIndex];
+          final nuevoStock = (pInfo['stock_actual'] ?? 0) - item['cantidad_total'];
+          await Supabase.instance.client.from('productos').update({'stock_actual': nuevoStock}).eq('id', item['producto_id']);
+        }
       }
 
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('¡Despacho registrado con éxito!'), backgroundColor: Colors.green));
-      Navigator.pop(context);
-
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('¡Salida registrada con éxito!', style: TextStyle(fontWeight: FontWeight.bold)), backgroundColor: Colors.green));
+        Navigator.pop(context); 
+      }
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
   @override
   void dispose() {
-    _referenciaController.dispose();
+    _motivoController.dispose();
     _cajasController.dispose();
     _piezasController.dispose();
+    _buscadorSucursalController.dispose();
+    _buscadorProductoController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Despacho de Mercancía', style: TextStyle(fontWeight: FontWeight.bold)), backgroundColor: Colors.deepOrange.shade800),
-      body: _productos.isEmpty 
-        ? const Center(child: Text('No hay productos con stock disponible para sacar.', style: TextStyle(color: Colors.grey)))
-        : Column(
-            children: [
-              // --- ENCABEZADO ---
-              Container(
-                padding: const EdgeInsets.all(16),
-                color: const Color(0xFF1A1A1A),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Datos de Envío', style: TextStyle(color: Colors.orangeAccent, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(flex: 2, child: _buildDropdown('Sucursal Destino *', 'Seleccione', _sucursalesDestino, _destinoSeleccionado, (v) => setState(() => _destinoSeleccionado = v as int?))),
-                        const SizedBox(width: 12),
-                        Expanded(flex: 1, child: _buildTextField('Referencia', 'Opcional', controller: _referenciaController)),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+    // Cálculo en tiempo real
+    double totalCalculado = 0;
+    String unidadCalculada = '';
+    if (_productoSeleccionado != null) {
+      final pIndex = _productos.indexWhere((p) => p['id'] == _productoSeleccionado);
+      if (pIndex != -1) {
+        final pInfo = _productos[pIndex];
+        final cajas = int.tryParse(_cajasController.text.trim()) ?? 0;
+        final piezas = double.tryParse(_piezasController.text.trim()) ?? 0;
+        final pxc = (pInfo['piezas_por_caja'] ?? 1) as num;
+        totalCalculado = (cajas * pxc) + piezas;
+        unidadCalculada = pInfo['unidad_medida'] ?? '';
+      }
+    }
 
-              // --- FORMULARIO MULTI-UNIDAD ---
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Form(
-                  key: _lineaFormKey,
+    String totalStr = totalCalculado.toString();
+    if (totalStr.endsWith('.0')) totalStr = totalStr.substring(0, totalStr.length - 2);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Salida de Mercancía', style: TextStyle(fontWeight: FontWeight.bold)), backgroundColor: Colors.red.shade800),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              children: [
+                // --- PANEL SUPERIOR: FORMULARIO ---
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  color: const Color(0xFF1A1A1A),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildDropdown('Producto a despachar *', 'Buscar...', _productos, _productoActual, (v) => setState(() => _productoActual = v as int?)),
+                      const Text('Datos del Traspaso / Merma', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 12),
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(child: _buildTextField('Cajas', '0', controller: _cajasController, isNumber: true, onChanged: (_) => setState(() {}))),
+                          Expanded(
+                            flex: 2, 
+                            child: _buildSearchableDropdown('Destino (Sucursal/Área) *', 'Buscar...', _sucursales, _sucursalSeleccionada, _buscadorSucursalController, (v) => setState(() => _sucursalSeleccionada = v))
+                          ),
                           const SizedBox(width: 12),
-                          Expanded(child: _buildTextField('Piezas Sueltas', '0', controller: _piezasController, isNumber: true, onChanged: (_) => setState(() {}))),
+                          Expanded(flex: 1, child: _buildTextField('Motivo', 'Ej. Merma...', controller: _motivoController)),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      _buildSearchableDropdown('Producto a sacar *', 'Escribe para buscar...', _productos, _productoSeleccionado, _buscadorProductoController, (v) => setState(() => _productoSeleccionado = v)),
+                      
+                      const SizedBox(height: 16),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(child: _buildTextField('Costales/Bidones/Cajas', '0', controller: _cajasController, isNumber: true, onChanged: (_) => setState((){}))),
+                          const SizedBox(width: 12),
+                          Expanded(child: _buildTextField('KG/L/PZ/Latas', '0', controller: _piezasController, isNumber: true, onChanged: (_) => setState((){}))),
                         ],
                       ),
                       const SizedBox(height: 8),
-                      
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          // Mostramos el stock actual para que el almacenista sepa cuánto puede sacar
-                          Text(
-                            _productoActual != null ? 'Disponible: ${_productos.firstWhere((p) => p['id'] == _productoActual)['stock_actual']}' : '',
-                            style: const TextStyle(color: Colors.grey, fontSize: 12),
+                          Expanded(
+                            child: Text(
+                              totalCalculado > 0 ? 'A restar: -$totalStr $unidadCalculada' : '',
+                              style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
+                            ),
                           ),
-                          Text(
-                            'Total a sacar: ${_calcularTotalTemporal()} ${ _productoActual != null ? _productos.firstWhere((p) => p['id'] == _productoActual)['unidad_medida'] : ''}',
-                            style: const TextStyle(color: Colors.orangeAccent, fontWeight: FontWeight.bold, fontSize: 14),
+                          ElevatedButton.icon(
+                            onPressed: _agregarALista, 
+                            icon: const Icon(Icons.outbox, color: Colors.white, size: 18), 
+                            label: const Text('Extraer', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)), 
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent.shade700, padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24))
                           ),
                         ],
-                      ),
-                      const SizedBox(height: 12),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: ElevatedButton.icon(
-                          onPressed: _agregarALaLista,
-                          icon: const Icon(Icons.arrow_downward, color: Colors.white, size: 18),
-                          label: const Text('Agregar a salida', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.deepOrangeAccent, padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16)),
-                        ),
                       ),
                     ],
                   ),
                 ),
-              ),
-              const Divider(color: Colors.grey),
+                const Divider(color: Colors.grey, height: 1),
 
-              // --- CARRITO ---
-              Expanded(
-                child: _listaSalidas.isEmpty
-                  ? const Center(child: Text('La lista está vacía.', style: TextStyle(color: Colors.grey)))
-                  : ListView.builder(
-                      itemCount: _listaSalidas.length,
-                      itemBuilder: (context, index) {
-                        final item = _listaSalidas[index];
-                        return ListTile(
-                          leading: CircleAvatar(backgroundColor: Colors.red.withValues(alpha: 0.2), child: const Icon(Icons.outbox, color: Colors.redAccent, size: 20)),
-                          title: Text(item['nombre_producto'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Text('Cajas = ${item['cajas']}, Piezas = ${item['piezas_sueltas']}\nTotal a restar: ${item['cantidad']} ${item['unidad']}'),
-                          trailing: IconButton(icon: const Icon(Icons.delete_outline, color: Colors.redAccent), onPressed: () => _eliminarDeLaLista(index)),
-                        );
-                      },
-                    ),
-              ),
-
-              Container(
-                padding: const EdgeInsets.all(16),
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _guardarSalidaMasiva,
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.deepOrange.shade600, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                  child: _isLoading 
-                    ? const CircularProgressIndicator(color: Colors.white) 
-                    : Text('Confirmar Despacho (${_listaSalidas.length} Insumos)', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                // --- PANEL MEDIO: LISTA DE EXTRACCIÓN ---
+                Expanded(
+                  child: _productosAgregados.isEmpty
+                      ? const Center(child: Text('Ningún producto seleccionado.\nUsa el buscador arriba.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)))
+                      : ListView.builder(
+                          itemCount: _productosAgregados.length,
+                          itemBuilder: (context, index) {
+                            final item = _productosAgregados[index];
+                            return ListTile(
+                              leading: const Icon(Icons.arrow_circle_up, color: Colors.redAccent),
+                              title: Text(item['nombre'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                              subtitle: Text('Quedarán en almacén: ${item['stock_despues']} ${item['unidad']}'),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text('- ${item['cantidad_total']}', style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 18)),
+                                  IconButton(icon: const Icon(Icons.delete, color: Colors.grey), onPressed: () => _eliminarDeLista(index)),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
                 ),
-              ),
-            ],
-          ),
+
+                // --- BOTÓN INFERIOR: CONFIRMAR ---
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: (_isSaving || _productosAgregados.isEmpty) ? null : _confirmarSalida,
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade700, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                    child: _isSaving 
+                      ? const CircularProgressIndicator(color: Colors.white) 
+                      : Text('Confirmar Salida (${_productosAgregados.length} Insumos)', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                  ),
+                ),
+              ],
+            ),
     );
   }
 
@@ -304,19 +293,37 @@ class _OutboundScreenState extends State<OutboundScreen> {
     );
   }
 
-  Widget _buildDropdown(String label, String hint, List<dynamic> items, int? selectedValue, Function(dynamic) onChanged) {
+  Widget _buildSearchableDropdown(String label, String hint, List<dynamic> items, dynamic selectedValue, TextEditingController controller, Function(dynamic) onChanged) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
         const SizedBox(height: 4),
-        DropdownButtonFormField<int>(
-          initialValue: selectedValue,
-          isExpanded: true, 
-          decoration: InputDecoration(filled: true, fillColor: const Color(0xFF2A2A2A), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none)),
-          hint: Text(hint),
-          items: items.map((item) => DropdownMenuItem<int>(value: item['id'], child: Text(item['nombre']))).toList(),
-          onChanged: onChanged,
+        LayoutBuilder(
+          builder: (context, constraints) {
+            return DropdownMenu<dynamic>(
+              controller: controller,
+              width: constraints.maxWidth, 
+              menuHeight: 250, 
+              enableFilter: true, 
+              hintText: hint,
+              initialSelection: selectedValue,
+              textStyle: const TextStyle(fontSize: 14),
+              inputDecorationTheme: InputDecorationTheme(
+                filled: true,
+                fillColor: const Color(0xFF2A2A2A),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+              ),
+              dropdownMenuEntries: items.map((item) {
+                return DropdownMenuEntry<dynamic>(
+                  value: item['id'],
+                  label: item['nombre'],
+                );
+              }).toList(),
+              onSelected: onChanged,
+            );
+          }
         ),
       ],
     );

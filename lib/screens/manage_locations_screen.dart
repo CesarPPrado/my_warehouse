@@ -143,7 +143,7 @@ class _ManageLocationsScreenState extends State<ManageLocationsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Sucursales y Bodegas', style: TextStyle(fontWeight: FontWeight.bold)), backgroundColor: Colors.blue.shade800),
+      appBar: AppBar(title: const Text('Sucursales y Areas', style: TextStyle(fontWeight: FontWeight.bold)), backgroundColor: Colors.blue.shade800),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _sucursales.isEmpty
