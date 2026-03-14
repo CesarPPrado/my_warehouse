@@ -11,6 +11,9 @@ class ManageRecipesScreen extends StatefulWidget {
 
 class _ManageRecipesScreenState extends State<ManageRecipesScreen> {
   List<Map<String, dynamic>> _recetasCompletas = [];
+  List<Map<String, dynamic>> _recetasFiltradas = []; // <--- NUEVA LISTA
+  
+  final TextEditingController _searchController = TextEditingController(); // <--- CONTROLADOR
   bool _isLoading = true;
 
   @override
@@ -22,12 +25,9 @@ class _ManageRecipesScreenState extends State<ManageRecipesScreen> {
   Future<void> _cargarRecetas() async {
     setState(() => _isLoading = true);
     try {
-      // 1. Descargamos las recetas
       final recetas = await Supabase.instance.client.from('recetas').select();
-      // 2. Descargamos los productos para saber el nombre del Kit
       final productos = await Supabase.instance.client.from('productos').select('id, nombre');
 
-      // 3. Unimos los datos para la pantalla
       List<Map<String, dynamic>> listaUnida = [];
       for (var r in recetas) {
         final prodInfo = productos.firstWhere((p) => p['id'] == r['producto_resultante_id'], orElse: () => {'nombre': 'Producto Eliminado'});
@@ -39,11 +39,33 @@ class _ManageRecipesScreenState extends State<ManageRecipesScreen> {
         });
       }
 
-      if (mounted) setState(() => _recetasCompletas = listaUnida);
+      // Ordenamos alfabéticamente para que se vea más limpio
+      listaUnida.sort((a, b) => a['nombre_producto'].toString().compareTo(b['nombre_producto'].toString()));
+
+      if (mounted) {
+        setState(() {
+          _recetasCompletas = listaUnida;
+          _recetasFiltradas = listaUnida;
+        });
+      }
     } catch (e) {
       debugPrint('Error: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // --- EL MOTOR DE BÚSQUEDA ---
+  void _filtrarBusqueda(String query) {
+    if (query.isEmpty) {
+      setState(() => _recetasFiltradas = _recetasCompletas);
+    } else {
+      setState(() {
+        _recetasFiltradas = _recetasCompletas.where((receta) {
+          final nombre = receta['nombre_producto'].toString().toLowerCase();
+          return nombre.contains(query.toLowerCase());
+        }).toList();
+      });
     }
   }
 
@@ -64,55 +86,113 @@ class _ManageRecipesScreenState extends State<ManageRecipesScreen> {
     if (confirm != true) return;
 
     try {
-      // Al borrar la receta, la base de datos borra los ingredientes automáticamente por el "ON DELETE CASCADE" que configuramos
       await Supabase.instance.client.from('recetas').delete().eq('id', idReceta);
-      // También borramos el producto (Kit) del catálogo
       await Supabase.instance.client.from('productos').delete().eq('id', idProducto);
-      _cargarRecetas(); // Recargamos la lista
+      _cargarRecetas(); 
+      _searchController.clear(); // Limpiamos buscador al borrar
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
     }
   }
 
   @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Gestión de Fórmulas y Kits', style: TextStyle(fontWeight: FontWeight.bold)), backgroundColor: Colors.orange.shade800),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _recetasCompletas.isEmpty
-              ? const Center(child: Text('No hay fórmulas registradas', style: TextStyle(color: Colors.grey)))
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _recetasCompletas.length,
-                  itemBuilder: (context, index) {
-                    final item = _recetasCompletas[index];
-                    return Card(
-                      color: const Color(0xFF1A1A1A),
-                      child: ListTile(
-                        leading: CircleAvatar(backgroundColor: Colors.orange.withValues(alpha: 0.2), child: const Icon(Icons.science, color: Colors.orangeAccent)),
-                        title: Text(item['nombre_producto'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('Tipo: ${item['tipo_receta']}'),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.edit, color: Colors.blueAccent),
-                              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => RecipeFormScreen(recetaAEditar: item))).then((_) => _cargarRecetas()),
+      body: Column(
+        children: [
+          // --- BARRA DE BÚSQUEDA ---
+          Container(
+            color: const Color(0xFF1A1A1A),
+            padding: const EdgeInsets.all(12.0),
+            child: TextField(
+              controller: _searchController,
+              onChanged: _filtrarBusqueda,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Buscar fórmula o kit...',
+                hintStyle: const TextStyle(color: Colors.grey),
+                prefixIcon: const Icon(Icons.search, color: Colors.orangeAccent),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, color: Colors.grey),
+                        onPressed: () {
+                          _searchController.clear();
+                          _filtrarBusqueda('');
+                        },
+                      )
+                    : null,
+                filled: true,
+                fillColor: const Color(0xFF2A2A2A),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                contentPadding: const EdgeInsets.symmetric(vertical: 0),
+              ),
+            ),
+          ),
+
+          // --- LISTA FILTRADA ---
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _recetasFiltradas.isEmpty
+                    ? Center(
+                        child: Text(
+                          _searchController.text.isEmpty 
+                            ? 'No hay fórmulas registradas' 
+                            : 'No se encontraron resultados.', 
+                          style: const TextStyle(color: Colors.grey)
+                        )
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _recetasFiltradas.length,
+                        itemBuilder: (context, index) {
+                          final item = _recetasFiltradas[index];
+                          return Card(
+                            color: const Color(0xFF1A1A1A),
+                            child: ListTile(
+                              leading: CircleAvatar(backgroundColor: Colors.orange.withValues(alpha: 0.2), child: const Icon(Icons.science, color: Colors.orangeAccent)),
+                              title: Text(item['nombre_producto'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                              subtitle: Text('Tipo: ${item['tipo_receta']}'),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.edit, color: Colors.blueAccent),
+                                    onPressed: () {
+                                      Navigator.push(context, MaterialPageRoute(builder: (_) => RecipeFormScreen(recetaAEditar: item))).then((_) {
+                                        _cargarRecetas();
+                                        _searchController.clear();
+                                      });
+                                    } 
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete, color: Colors.redAccent),
+                                    onPressed: () => _eliminarReceta(item['id'], item['producto_resultante_id']),
+                                  ),
+                                ],
+                              ),
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.redAccent),
-                              onPressed: () => _eliminarReceta(item['id'], item['producto_resultante_id']),
-                            ),
-                          ],
-                        ),
+                          );
+                        },
                       ),
-                    );
-                  },
-                ),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.orange.shade800,
-        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RecipeFormScreen())).then((_) => _cargarRecetas()),
+        onPressed: () {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const RecipeFormScreen())).then((_) {
+            _cargarRecetas();
+            _searchController.clear();
+          });
+        },
         child: const Icon(Icons.add, color: Colors.white),
       ),
     );

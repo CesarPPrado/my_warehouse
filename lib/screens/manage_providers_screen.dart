@@ -10,6 +10,9 @@ class ManageProvidersScreen extends StatefulWidget {
 
 class _ManageProvidersScreenState extends State<ManageProvidersScreen> {
   List<dynamic> _proveedores = [];
+  List<dynamic> _proveedoresFiltrados = []; // <--- NUEVA LISTA PARA EL BUSCADOR
+  
+  final TextEditingController _searchController = TextEditingController(); // <--- CONTROLADOR DEL BUSCADOR
   bool _isLoading = true;
 
   @override
@@ -29,12 +32,28 @@ class _ManageProvidersScreenState extends State<ManageProvidersScreen> {
       if (mounted) {
         setState(() {
           _proveedores = data;
+          _proveedoresFiltrados = data; // Al inicio, mostramos todos
           _isLoading = false;
         });
       }
     } catch (e) {
       debugPrint('Error: $e');
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // --- NUEVA FUNCIÓN QUE FILTRA EN TIEMPO REAL ---
+  void _filtrarBusqueda(String query) {
+    if (query.isEmpty) {
+      setState(() => _proveedoresFiltrados = _proveedores);
+    } else {
+      setState(() {
+        _proveedoresFiltrados = _proveedores.where((prov) {
+          final nombre = prov['nombre'].toString().toLowerCase();
+          final busqueda = query.toLowerCase();
+          return nombre.contains(busqueda);
+        }).toList();
+      });
     }
   }
 
@@ -57,6 +76,7 @@ class _ManageProvidersScreenState extends State<ManageProvidersScreen> {
     try {
       await Supabase.instance.client.from('proveedores').delete().eq('id', id);
       _cargarProveedores();
+      _searchController.clear(); // Limpiamos el buscador al borrar
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Proveedor eliminado'), backgroundColor: Colors.green));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
@@ -115,6 +135,7 @@ class _ManageProvidersScreenState extends State<ManageProvidersScreen> {
                       if (!context.mounted) return; {
                         Navigator.pop(context);
                         _cargarProveedores();
+                        _searchController.clear(); // Limpiamos buscador al guardar
                       }
                     } catch (e) {
                       debugPrint('Error guardando: $e');
@@ -132,35 +153,87 @@ class _ManageProvidersScreenState extends State<ManageProvidersScreen> {
   }
 
   @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Proveedores Externos', style: TextStyle(fontWeight: FontWeight.bold)), backgroundColor: Colors.purple.shade800),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _proveedores.isEmpty
-              ? const Center(child: Text('No hay proveedores registrados.', style: TextStyle(color: Colors.grey)))
-              : ListView.builder(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: _proveedores.length,
-                  itemBuilder: (context, index) {
-                    final prov = _proveedores[index];
-                    return Card(
-                      color: const Color(0xFF1A1A1A),
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: ListTile(
-                        title: Text(prov['nombre'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text(prov['telefono']?.toString().isNotEmpty == true ? 'Tel: ${prov['telefono']}' : 'Sin teléfono', style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(icon: const Icon(Icons.edit, color: Colors.purpleAccent), onPressed: () => _mostrarFormulario(prov)),
-                            IconButton(icon: const Icon(Icons.delete, color: Colors.redAccent), onPressed: () => _eliminarProveedor(prov['id'])),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
+      body: Column(
+        children: [
+          // --- NUESTRO NUEVO BUSCADOR VISUAL ---
+          Container(
+            color: const Color(0xFF1A1A1A),
+            padding: const EdgeInsets.all(12.0),
+            child: TextField(
+              controller: _searchController,
+              onChanged: _filtrarBusqueda,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Buscar proveedor...',
+                hintStyle: const TextStyle(color: Colors.grey),
+                prefixIcon: const Icon(Icons.search, color: Colors.purpleAccent),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, color: Colors.grey),
+                        onPressed: () {
+                          _searchController.clear();
+                          _filtrarBusqueda('');
+                        },
+                      )
+                    : null,
+                filled: true,
+                fillColor: const Color(0xFF2A2A2A),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
                 ),
+                contentPadding: const EdgeInsets.symmetric(vertical: 0),
+              ),
+            ),
+          ),
+          
+          // --- LA LISTA QUE AHORA DEPENDE DE _proveedoresFiltrados ---
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _proveedoresFiltrados.isEmpty
+                    ? Center(
+                        child: Text(
+                          _searchController.text.isEmpty 
+                            ? 'No hay proveedores registrados.' 
+                            : 'No se encontraron resultados.', 
+                          style: const TextStyle(color: Colors.grey)
+                        )
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(12),
+                        itemCount: _proveedoresFiltrados.length,
+                        itemBuilder: (context, index) {
+                          final prov = _proveedoresFiltrados[index];
+                          return Card(
+                            color: const Color(0xFF1A1A1A),
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: ListTile(
+                              title: Text(prov['nombre'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                              subtitle: Text(prov['telefono']?.toString().isNotEmpty == true ? 'Tel: ${prov['telefono']}' : 'Sin teléfono', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(icon: const Icon(Icons.edit, color: Colors.purpleAccent), onPressed: () => _mostrarFormulario(prov)),
+                                  IconButton(icon: const Icon(Icons.delete, color: Colors.redAccent), onPressed: () => _eliminarProveedor(prov['id'])),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.purple.shade600,
         onPressed: () => _mostrarFormulario(),

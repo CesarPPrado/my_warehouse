@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ManageLocationsScreen extends StatefulWidget {
-  // ¡Fíjate cómo aquí ya borramos el esProveedor y el titulo! Ya no los necesita.
   const ManageLocationsScreen({super.key});
 
   @override
@@ -11,6 +10,9 @@ class ManageLocationsScreen extends StatefulWidget {
 
 class _ManageLocationsScreenState extends State<ManageLocationsScreen> {
   List<dynamic> _sucursales = [];
+  List<dynamic> _sucursalesFiltradas = []; // <--- NUEVA LISTA
+  
+  final TextEditingController _searchController = TextEditingController(); // <--- CONTROLADOR
   bool _isLoading = true;
 
   @override
@@ -30,12 +32,27 @@ class _ManageLocationsScreenState extends State<ManageLocationsScreen> {
       if (mounted) {
         setState(() {
           _sucursales = data;
+          _sucursalesFiltradas = data; // Al inicio mostramos todas
           _isLoading = false;
         });
       }
     } catch (e) {
       debugPrint('Error: $e');
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // --- EL MOTOR DE BÚSQUEDA ---
+  void _filtrarBusqueda(String query) {
+    if (query.isEmpty) {
+      setState(() => _sucursalesFiltradas = _sucursales);
+    } else {
+      setState(() {
+        _sucursalesFiltradas = _sucursales.where((suc) {
+          final nombre = suc['nombre'].toString().toLowerCase();
+          return nombre.contains(query.toLowerCase());
+        }).toList();
+      });
     }
   }
 
@@ -58,6 +75,7 @@ class _ManageLocationsScreenState extends State<ManageLocationsScreen> {
     try {
       await Supabase.instance.client.from('sucursales').delete().eq('id', id);
       _cargarSucursales();
+      _searchController.clear(); // Limpiamos buscador
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Registro eliminado'), backgroundColor: Colors.green));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
@@ -75,7 +93,6 @@ class _ManageLocationsScreenState extends State<ManageLocationsScreen> {
       backgroundColor: const Color(0xFF1A1A1A),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) {
-        // Usamos StatefulBuilder para que el Dropdown pueda actualizar la pantalla solo dentro del panel
         return StatefulBuilder( 
           builder: (BuildContext context, StateSetter setModalState) {
             return Padding(
@@ -122,6 +139,7 @@ class _ManageLocationsScreenState extends State<ManageLocationsScreen> {
                           if (!context.mounted) return; {
                             Navigator.pop(context);
                             _cargarSucursales();
+                            _searchController.clear(); // Limpiamos buscador
                           }
                         } catch (e) {
                           debugPrint('Error guardando: $e');
@@ -141,39 +159,88 @@ class _ManageLocationsScreenState extends State<ManageLocationsScreen> {
   }
 
   @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Sucursales y Areas', style: TextStyle(fontWeight: FontWeight.bold)), backgroundColor: Colors.blue.shade800),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _sucursales.isEmpty
-              ? const Center(child: Text('No hay registros de áreas.', style: TextStyle(color: Colors.grey)))
-              : ListView.builder(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: _sucursales.length,
-                  itemBuilder: (context, index) {
-                    final suc = _sucursales[index];
-                    return Card(
-                      color: const Color(0xFF1A1A1A),
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: ListTile(
-                        leading: Icon(
-                          suc['tipo'] == 'Bodega' ? Icons.warehouse : (suc['tipo'] == 'Producción' ? Icons.precision_manufacturing : Icons.storefront),
-                          color: Colors.blueAccent
-                        ),
-                        title: Text(suc['nombre'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('Tipo: ${suc['tipo'] ?? 'N/A'}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(icon: const Icon(Icons.edit, color: Colors.blueAccent), onPressed: () => _mostrarFormulario(suc)),
-                            IconButton(icon: const Icon(Icons.delete, color: Colors.redAccent), onPressed: () => _eliminarSucursal(suc['id'])),
-                          ],
-                        ),
+      appBar: AppBar(title: const Text('Sucursales y Bodegas', style: TextStyle(fontWeight: FontWeight.bold)), backgroundColor: Colors.blue.shade800),
+      body: Column(
+        children: [
+          // --- BARRA DE BÚSQUEDA ---
+          Container(
+            color: const Color(0xFF1A1A1A),
+            padding: const EdgeInsets.all(12.0),
+            child: TextField(
+              controller: _searchController,
+              onChanged: _filtrarBusqueda,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Buscar sucursal o área...',
+                hintStyle: const TextStyle(color: Colors.grey),
+                prefixIcon: const Icon(Icons.search, color: Colors.blueAccent),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, color: Colors.grey),
+                        onPressed: () {
+                          _searchController.clear();
+                          _filtrarBusqueda('');
+                        },
+                      )
+                    : null,
+                filled: true,
+                fillColor: const Color(0xFF2A2A2A),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                contentPadding: const EdgeInsets.symmetric(vertical: 0),
+              ),
+            ),
+          ),
+
+          // --- LISTA FILTRADA ---
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _sucursalesFiltradas.isEmpty
+                    ? Center(
+                        child: Text(
+                          _searchController.text.isEmpty 
+                            ? 'No hay registros de áreas.' 
+                            : 'No se encontraron resultados.', 
+                          style: const TextStyle(color: Colors.grey)
+                        )
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(12),
+                        itemCount: _sucursalesFiltradas.length,
+                        itemBuilder: (context, index) {
+                          final suc = _sucursalesFiltradas[index];
+                          return Card(
+                            color: const Color(0xFF1A1A1A),
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: ListTile(
+                              leading: Icon(
+                                suc['tipo'] == 'Bodega' ? Icons.warehouse : (suc['tipo'] == 'Producción' ? Icons.precision_manufacturing : Icons.storefront),
+                                color: Colors.blueAccent
+                              ),
+                              title: Text(suc['nombre'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                              subtitle: Text('Tipo: ${suc['tipo'] ?? 'N/A'}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(icon: const Icon(Icons.edit, color: Colors.blueAccent), onPressed: () => _mostrarFormulario(suc)),
+                                  IconButton(icon: const Icon(Icons.delete, color: Colors.redAccent), onPressed: () => _eliminarSucursal(suc['id'])),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
                       ),
-                    );
-                  },
-                ),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.blue.shade600,
         onPressed: () => _mostrarFormulario(),
