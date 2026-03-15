@@ -156,9 +156,9 @@ class _InboundScreenState extends State<InboundScreen> {
     _cajasController.dispose();
     _piezasController.dispose();
     _loteController.dispose();
-    _buscadorProveedorController.dispose(); // Limpiamos memoria
-    _buscadorProductoController.dispose();  // Limpiamos memoria
-    super.dispose();
+    _buscadorProveedorController.dispose();
+    _buscadorProductoController.dispose();
+    super.dispose(); // Siempre llamamos al dispose del padre al final
   }
 
   @override
@@ -206,7 +206,7 @@ class _InboundScreenState extends State<InboundScreen> {
                             child: _buildSearchableDropdown('Proveedor *', 'Buscar...', _proveedores, _proveedorSeleccionado, _buscadorProveedorController, (v) => setState(() => _proveedorSeleccionado = v))
                           ),
                           const SizedBox(width: 12),
-                          Expanded(flex: 1, child: _buildTextField('Factura', 'Opcional', controller: _facturaController)),
+                          Expanded(flex: 1, child: _buildTextField('Factura *', 'Ej. F-20231', controller: _facturaController)),
                         ],
                       ),
                       const SizedBox(height: 16),

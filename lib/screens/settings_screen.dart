@@ -4,6 +4,7 @@ import 'manage_locations_screen.dart';
 import 'manage_recipes_screen.dart';
 import 'package:my_warehouse/screens/manage_providers_screen.dart';
 import 'package:my_warehouse/screens/manage_area_stock_screen.dart';
+import 'audit_history_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -35,6 +36,9 @@ class SettingsScreen extends StatelessWidget {
           // Pantalla Stock de Areas (Cian)
           _buildSettingsCard(context, Icons.checklist_rtl, 'Plantillas de Stock Base', 'Configurar cuánto insumo debe tener cada área', Colors.teal, const ManageAreaStockScreen()),
           
+          //Pantalla Auditorias (Gris)
+          _buildSettingsCard(context, Icons.history_edu, 'Historial de Cierres', 'Revisar reportes de auditorías pasadas', Colors.cyan, const AuditHistoryScreen()),
+
           const SizedBox(height: 32),
           const Text('Ajustes del Sistema', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey)),
           const SizedBox(height: 16),

@@ -25,8 +25,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   String? _categoriaSeleccionada;
   String? _unidadSeleccionada;
 
-  final List<String> _categorias = ['Materia Prima', 'Producción', 'Empaque', 'Limpieza', 'Mantenimiento', 'Otros',  'Complementos', 'Harinas y Polvos'];
-  final List<String> _unidades = ['Kilos', 'Gramos', 'Litros', 'Sacos', 'Bolsas', 'Costales', 'Piezas', 'Cajas', 'Bidones', 'Latas', 'Paquetes'];
+  final List<String> _categorias = ['Materia Prima', 'Mantecas y Lácteos', 'Producción', 'Empaque', 'Limpieza', 'Mantenimiento', 'Complementos', 'Harinas y Polvos', 'Otros'];
+  final List<String> _unidades = ['Kilos', 'Gramos', 'Litros', 'Sacos', 'Bolsas', 'Costales', 'Piezas', 'Cajas', 'Bidones', 'Latas', 'Bultos', 'Paquetes'];
 
   @override
   void initState() {
@@ -126,7 +126,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              _buildTextField('Piezas por caja/empaque *', 'Ej. 24 (Dejar en 1 si es granel)', controller: _piezasPorCajaController, isNumber: true, isRequired: true),
+              _buildTextField('KG/L/PZ/Paquetes por caja/empaque *', 'Ej. 24 (Dejar en 1 si es granel)', controller: _piezasPorCajaController, isNumber: true, isRequired: true),
               const SizedBox(height: 24),
               
               // --- SECCIÓN DE AGRUPACIÓN ---

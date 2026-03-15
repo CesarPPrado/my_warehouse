@@ -5,6 +5,7 @@ import 'inventory_screen.dart';
 import 'production_screen.dart';
 import 'inbound_screen.dart';
 import 'outbound_screen.dart';
+import 'area_audit_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -102,7 +103,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 'Acciones Rápidas',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-              const SizedBox(height: 16),
+              
+              const SizedBox(height: 8),
               
               GridView.count(
                 shrinkWrap: true, 
@@ -144,7 +146,21 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
               
-              const SizedBox(height: 32), 
+              const SizedBox(height: 16), 
+
+              // --- NUEVO BOTÓN DE AUDITORÍA ---
+              SizedBox(
+                width: double.infinity,
+                child: ActionButton(
+                  title: 'Auditoría y Cierre de Área',
+                  subtitle: 'Cuenta sobrantes y genera resurtido automático',
+                  icon: Icons.checklist_rtl,
+                  color: Colors.cyan.shade800,
+                  onTap: () => _abrirPantallaYRecargar(const AreaAuditScreen()),
+                ),
+              ),
+
+              const SizedBox(height: 16),
 
               const Row(
                 children: [
