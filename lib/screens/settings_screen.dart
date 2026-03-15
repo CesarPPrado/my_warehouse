@@ -13,7 +13,7 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Configuración y Catálogos', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Configuración', style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
       ),
       body: ListView(
@@ -31,12 +31,12 @@ class SettingsScreen extends StatelessWidget {
           _buildSettingsCard(context, Icons.people, 'Gestionar Proveedores', 'Administrar catálogo de proveedores', Colors.purple, const ManageProvidersScreen()),
 
           // Pantalla Pesajes (Naranja)
-          _buildSettingsCard(context, Icons.science, 'Fórmulas y Recetas', 'Configurar pesajes y compuestos', Colors.orange, const ManageRecipesScreen()),
+          _buildSettingsCard(context, Icons.science, 'Gestionar Recetas', 'Configurar pesajes, compuestos y kits', Colors.orange, const ManageRecipesScreen()),
           
-          // Pantalla Stock de Areas (Cian)
+          // Pantalla Stock de Areas (Turquesa)
           _buildSettingsCard(context, Icons.checklist_rtl, 'Plantillas de Stock Base', 'Configurar cuánto insumo debe tener cada área', Colors.teal, const ManageAreaStockScreen()),
           
-          //Pantalla Auditorias (Gris)
+          //Pantalla Auditorias (Cian)
           _buildSettingsCard(context, Icons.history_edu, 'Historial de Cierres', 'Revisar reportes de auditorías pasadas', Colors.cyan, const AuditHistoryScreen()),
 
           const SizedBox(height: 32),
