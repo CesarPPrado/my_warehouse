@@ -26,7 +26,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   String? _unidadSeleccionada;
 
   final List<String> _categorias = ['Materia Prima', 'Producción', 'Empaque', 'Limpieza', 'Mantenimiento', 'Otros',  'Complementos', 'Harinas y Polvos'];
-  final List<String> _unidades = ['Kilos', 'Gramos', 'Litros', 'Sacos', 'Bolsas', 'Costales', 'Piezas', 'Cajas', 'Bidones', 'Latas'];
+  final List<String> _unidades = ['Kilos', 'Gramos', 'Litros', 'Sacos', 'Bolsas', 'Costales', 'Piezas', 'Cajas', 'Bidones', 'Latas', 'Paquetes'];
 
   @override
   void initState() {

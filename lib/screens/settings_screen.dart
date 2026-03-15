@@ -3,6 +3,7 @@ import 'manage_products_screen.dart';
 import 'manage_locations_screen.dart';
 import 'manage_recipes_screen.dart';
 import 'package:my_warehouse/screens/manage_providers_screen.dart';
+import 'package:my_warehouse/screens/manage_area_stock_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -17,17 +18,22 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
-          const Text('Gestión de Base de Datos', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.greenAccent)),
+          const Text('Gestión de Base de Datos', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey)),
           const SizedBox(height: 16),
-          // Aquí conectamos la pantalla de Gestionar Productos
+          // Pantalla Gestionar Productos (Verde)
           _buildSettingsCard(context, Icons.inventory_2, 'Gestionar Productos', 'Agregar, editar o eliminar insumos del catálogo', Colors.green, const ManageProductsScreen()),
 
-          // Pantalla 1: Solo Sucursales (Azul)
+          // Pantalla Sucursales (Azul)
           _buildSettingsCard(context, Icons.storefront, 'Gestionar Sucursales', 'Configurar puntos de distribución', Colors.blue, const ManageLocationsScreen()),
           
-          // Pantalla 2: Solo Proveedores (Morado)
+          // Pantalla Proveedores (Morado)
           _buildSettingsCard(context, Icons.people, 'Gestionar Proveedores', 'Administrar catálogo de proveedores', Colors.purple, const ManageProvidersScreen()),
+
+          // Pantalla Pesajes (Naranja)
           _buildSettingsCard(context, Icons.science, 'Fórmulas y Recetas', 'Configurar pesajes y compuestos', Colors.orange, const ManageRecipesScreen()),
+          
+          // Pantalla Stock de Areas (Cian)
+          _buildSettingsCard(context, Icons.checklist_rtl, 'Plantillas de Stock Base', 'Configurar cuánto insumo debe tener cada área', Colors.teal, const ManageAreaStockScreen()),
           
           const SizedBox(height: 32),
           const Text('Ajustes del Sistema', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey)),
