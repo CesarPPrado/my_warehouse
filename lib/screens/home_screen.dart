@@ -148,7 +148,7 @@ class _HomeScreenState extends State<HomeScreen> {
               
               const SizedBox(height: 16), 
 
-              // --- NUEVO BOTÓN DE AUDITORÍA ---
+              // --- BOTÓN DE AUDITORÍA ---
               SizedBox(
                 width: double.infinity,
                 child: ActionButton(
@@ -156,7 +156,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   subtitle: 'Cuenta sobrantes y genera resurtido automático',
                   icon: Icons.checklist_rtl,
                   color: Colors.cyan.shade800,
+
+
                   onTap: () => _abrirPantallaYRecargar(const AreaAuditScreen()),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16), // Agregamos más espacio arriba y abajo
                 ),
               ),
 

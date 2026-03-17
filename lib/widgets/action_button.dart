@@ -6,6 +6,7 @@ class ActionButton extends StatelessWidget {
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
+  final EdgeInsetsGeometry? padding; 
 
   const ActionButton({
     super.key,
@@ -14,6 +15,7 @@ class ActionButton extends StatelessWidget {
     required this.icon,
     required this.color,
     required this.onTap,
+    this.padding,
   });
 
   @override
@@ -21,6 +23,8 @@ class ActionButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
+        // Si nos mandan un padding, lo usamos; si no, ponemos un margen de 16 por defecto.
+        padding: padding ?? const EdgeInsets.all(16.0),
         decoration: BoxDecoration(
           color: color,
           borderRadius: BorderRadius.circular(16),
@@ -32,16 +36,20 @@ class ActionButton extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               title,
+              textAlign: TextAlign.center, // Para que se vea siempre bien centrado
               style: const TextStyle(
                   color: Colors.white, 
                   fontWeight: FontWeight.bold, 
                   fontSize: 16),
             ),
-            if (subtitle.isNotEmpty)
+            if (subtitle.isNotEmpty) ...[
+              const SizedBox(height: 4), // Separación sutil entre título y subtítulo
               Text(
                 subtitle,
+                textAlign: TextAlign.center,
                 style: const TextStyle(color: Colors.white70, fontSize: 12),
               ),
+            ]
           ],
         ),
       ),

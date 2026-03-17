@@ -36,7 +36,7 @@ class SettingsScreen extends StatelessWidget {
           // Pantalla Stock de Areas (Turquesa)
           _buildSettingsCard(context, Icons.checklist_rtl, 'Plantillas de Stock Base', 'Configurar cuánto insumo debe tener cada área', Colors.teal, const ManageAreaStockScreen()),
           
-          //Pantalla Auditorias (Cian)
+          // Pantalla Auditorias (Cian)
           _buildSettingsCard(context, Icons.history_edu, 'Historial de Cierres', 'Revisar reportes de auditorías pasadas', Colors.cyan, const AuditHistoryScreen()),
 
           const SizedBox(height: 32),

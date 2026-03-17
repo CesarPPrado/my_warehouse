@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../widgets/custom_dropdown.dart';
 
 class ProductFormScreen extends StatefulWidget {
   final Map<String, dynamic>? productoAEditar;
@@ -162,13 +163,36 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   }
 
   Widget _buildTextField(String label, String hint, {TextEditingController? controller, bool isNumber = false, bool isRequired = false}) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)), const SizedBox(height: 4), TextFormField(controller: controller, keyboardType: isNumber ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text, validator: isRequired ? (v) => v == null || v.isEmpty ? 'Requerido' : null : null, decoration: InputDecoration(hintText: hint, filled: true, fillColor: const Color(0xFF2A2A2A), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none)))]);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start, 
+      children: [
+        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+        const SizedBox(height: 4),
+        TextFormField(
+          controller: controller, 
+          keyboardType: isNumber ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
+          validator: isRequired ? (v) => v == null || v.isEmpty ? 'Requerido' : null : null,
+          decoration: InputDecoration(hintText: hint, filled: true, fillColor: const Color(0xFF2A2A2A),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide.none)
+        )
+      )
+    ]);
   }
 
   Widget _buildDropdown(String label, String hint, List<String> items, Function(String?) onChanged, {bool isRequired = false}) {
     String? value;
     if (widget.productoAEditar != null && label.contains('Categoría')) value = _categoriaSeleccionada;
     if (widget.productoAEditar != null && label.contains('Unidad')) value = _unidadSeleccionada;
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)), const SizedBox(height: 4), DropdownButtonFormField<String>(initialValue: value, isExpanded: true, decoration: InputDecoration(filled: true, fillColor: const Color(0xFF2A2A2A), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none)), hint: Text(hint), items: items.map((i) => DropdownMenuItem(value: i, child: Text(i))).toList(), onChanged: onChanged, validator: isRequired ? (v) => v == null ? 'Requerido' : null : null)]);
+    
+    return CustomDropdown(
+      label: label,
+      hint: hint,
+      value: value,
+      items: items,
+      onChanged: onChanged,
+      validator: isRequired ? (v) => v == null ? 'Requerido' : null : null,
+    );
   }
 }
